@@ -60,7 +60,7 @@ wt = WindTurbine(
     v_in=4,
     v_rated=12.5,
     v_out=25,
-    power_curve_data=np.loadtxt("./tests/LEANWIND_Reference_8MW_164.csv",skiprows=1,delimiter=','),
+    power_curve_data=np.loadtxt("./homework/LEANWIND_Reference_8MW_164.csv",skiprows=1,delimiter=','),
     name="Leanwind 8 MW RWT")
 
 
