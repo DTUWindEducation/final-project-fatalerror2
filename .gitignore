@@ -1,5 +1,5 @@
 # files to ignore in this repo
-inputs/
+# inputs/
 outputs/
 
 # Byte-compiled / optimized / DLL files
@@ -176,3 +176,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# macOS
+.DS_store
