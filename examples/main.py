@@ -1,6 +1,8 @@
+#Import Packages
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
+from sklearn.model_selection import train_test_split
 
 # --- User Inputs ---
 variable_name = "Power"       # e.g., "temperature_2m", "Power", etc.
@@ -51,6 +53,24 @@ def filter_and_plot(site_df, variable_name, start_time, end_time, site_label):
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+# --- Function 4: Split the dataset into training dataset and test dataset. ---
+def split_site_data(site_df, test_size=0.2, random_state=42):
+    """
+    Splits the full site DataFrame (before time filtering) into training and test sets.
+    Shuffle is False to preserve chronological order (important for time series).
+    """
+    train_df, test_df = train_test_split(
+        site_df,
+        test_size=test_size,
+        random_state=random_state,
+        shuffle=False  # Keep time order for time series modeling
+    )
+    return train_df, test_df
+
+
+
+
 
 # --- Main Execution ---
 site_df, site_name = load_and_filter_by_site(site_files, site_index)
