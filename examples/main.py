@@ -64,10 +64,10 @@ def filter_and_plot(site_df, variable_name, start_time, end_time, site_label):
 def create_mlp_model(input_shape):
     model = Sequential()
     model.add(Input(shape=(input_shape,)))
-    model.add(Dense(128, activation='relu'))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(32, activation='relu'))
-    model.add(Dense(1))
+    model.add(Dense(256, activation='relu'))  # Increased from 128
+    model.add(Dense(128, activation='relu'))  # Increased from 64
+    model.add(Dense(64, activation='relu'))   # Increased from 32
+    model.add(Dense(1))  # Output layer
     model.compile(optimizer='adam', loss='mse')
     return model
 
