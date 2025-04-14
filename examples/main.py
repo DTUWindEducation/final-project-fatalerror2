@@ -7,7 +7,7 @@ from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras import Input
 import tensorflow as tf
@@ -25,8 +25,8 @@ tf.random.set_seed(seed)
 # --- User Inputs ---
 variable_name = "Power"       # e.g., "temperature_2m", "Power", etc.
 site_index = 2                # 1 to 4
-starting_time = "2021-01-01"  # Included; YYYY-MM-DD
-ending_time = "2021-01-02"    # Excluded (1-day prediction)
+starting_time = "2021-01-10 06:00"  # Included; YYYY-MM-DD
+ending_time = "2021-01-11 18:00"    # Excluded (1-day prediction)
 lookback_hours = 6           # History window for NN input
 training_window_months = 12    # Train only on the last N months before start_time
 
@@ -79,11 +79,13 @@ def filter_and_plot(site_df, variable_name, start_time, end_time, site_label):
     plt.tight_layout()
     plt.show()
 
-# --- Function 3: Neural network model (LSTM) ---
+# --- Function 3: Neural network model (Stacked LSTM) ---
 def create_lstm_model(input_shape):
     model = Sequential()
     model.add(Input(shape=input_shape))
-    model.add(LSTM(64, return_sequences=False))
+    model.add(LSTM(64, return_sequences=True))
+    model.add(Dropout(0.2))
+    model.add(LSTM(32, return_sequences=False))
     model.add(Dense(1))
     model.compile(optimizer='adam', loss='mse')
     return model
