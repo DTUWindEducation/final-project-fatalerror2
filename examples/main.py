@@ -7,7 +7,7 @@ from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import LSTM, Dense
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras import Input
 import tensorflow as tf
@@ -22,13 +22,13 @@ random.seed(seed)
 np.random.seed(seed)
 tf.random.set_seed(seed)
 
-
 # --- User Inputs ---
 variable_name = "Power"       # e.g., "temperature_2m", "Power", etc.
 site_index = 2                # 1 to 4
-starting_time = "2021-01-17"  # Included; YYYY-MM-DD
-ending_time = "2021-01-18"    # Excluded (1-day prediction)
+starting_time = "2021-01-01"  # Included; YYYY-MM-DD
+ending_time = "2021-01-02"    # Excluded (1-day prediction)
 lookback_hours = 6           # History window for NN input
+training_window_months = 12    # Train only on the last N months before start_time
 
 # --- File Paths ---
 script_dir = Path(__file__).resolve().parent
@@ -54,12 +54,12 @@ def load_and_filter_by_site(site_files, site_index):
     site_to_process = f'Location{site_index}'
     site_df = combined_df[combined_df['Site'] == site_to_process].copy()
     site_df['Time'] = pd.to_datetime(site_df['Time'])
-    
+
     # ⏰ Add time-of-day features
     site_df['hour'] = site_df['Time'].dt.hour
     site_df['hour_sin'] = np.sin(2 * np.pi * site_df['hour'] / 24)
     site_df['hour_cos'] = np.cos(2 * np.pi * site_df['hour'] / 24)
-    
+
     return site_df, site_to_process
 
 # --- Function 2: Filter by time and plot selected variable ---
@@ -79,14 +79,11 @@ def filter_and_plot(site_df, variable_name, start_time, end_time, site_label):
     plt.tight_layout()
     plt.show()
 
-# --- Function 3: Neural network model (MLP) ---
-def create_mlp_model(input_shape):
+# --- Function 3: Neural network model (LSTM) ---
+def create_lstm_model(input_shape):
     model = Sequential()
-    model.add(Input(shape=(input_shape,)))
-    model.add(Dense(256, activation='relu'))
-    model.add(Dense(128, activation='relu'))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(32, activation='relu'))  
+    model.add(Input(shape=input_shape))
+    model.add(LSTM(64, return_sequences=False))
     model.add(Dense(1))
     model.compile(optimizer='adam', loss='mse')
     return model
@@ -94,83 +91,70 @@ def create_mlp_model(input_shape):
 # --- Function 4: Forecast and plot prediction vs real ---
 def plot_forecast_vs_actual(site_df, start_time, end_time, site_label, model_func, lookback_hours=6):
     features = [
-    'temperature_2m', 'relativehumidity_2m', 'dewpoint_2m',
-    'windspeed_10m', 'windspeed_100m', 'winddirection_10m',
-    'winddirection_100m', 'windgusts_10m', 'Power',
-    'hour_sin', 'hour_cos'  # These two features encode the cyclical nature of time — for example, 23:00 and 01:00 are close in the cycle, even though they're numerically far apart. The sine and cosine together allow the model to “see” the curve of the day.
+        'temperature_2m', 'relativehumidity_2m', 'dewpoint_2m',
+        'windspeed_10m', 'windspeed_100m', 'winddirection_10m',
+        'winddirection_100m', 'windgusts_10m', 'Power',
+        'hour_sin', 'hour_cos'
     ]
-
 
     scaler = MinMaxScaler()
     site_df_scaled = site_df.copy()
     site_df_scaled[features] = scaler.fit_transform(site_df[features])
 
-    X_test, y_test, times = [], [], []
     start_dt = pd.to_datetime(start_time)
     end_dt = pd.to_datetime(end_time)
+    earliest_train_date = start_dt - pd.DateOffset(months=training_window_months)
+    train_df = site_df[(site_df['Time'] >= earliest_train_date) & (site_df['Time'] < start_dt)]
 
+    X_train, y_train = [], []
+    for i in range(lookback_hours, len(train_df) - 1):
+        past_window = site_df_scaled.iloc[i - lookback_hours:i][features]
+        if len(past_window) == lookback_hours:
+            X_train.append(past_window.values)
+            y_train.append(site_df.iloc[i + 1]['Power'])
+
+    X_test, y_test, times = [], [], []
     for i in range(lookback_hours, len(site_df_scaled) - 1):
-        current_time = site_df_scaled.iloc[i + 1]['Time']  # prediction time
+        current_time = site_df_scaled.iloc[i + 1]['Time']
         if start_dt <= current_time <= end_dt:
             input_window = site_df_scaled.iloc[i - lookback_hours + 1:i + 1][features]
             if len(input_window) == lookback_hours:
-                X_test.append(input_window.values.flatten())
+                X_test.append(input_window.values)
                 y_test.append(site_df.iloc[i + 1]['Power'])
                 times.append(current_time)
 
-
-    train_df = site_df[site_df['Time'] < pd.to_datetime(start_time)]
-    X_train, y_train = [], []
-    for i in range(lookback_hours, len(train_df) - 1):
-        past_window = train_df.iloc[i - lookback_hours:i][features]
-        if len(past_window) == lookback_hours:
-            X_train.append(past_window.values.flatten())
-            y_train.append(train_df.iloc[i + 1]['Power'])
-
-    X_train = np.array(X_train)
-    y_train = np.array(y_train)
-    X_test = np.array(X_test)
-    y_test = np.array(y_test)
+    X_train, y_train = np.array(X_train), np.array(y_train)
+    X_test, y_test = np.array(X_test), np.array(y_test)
 
     print(f"Train samples: {X_train.shape[0]}, Test samples: {X_test.shape[0]}")
 
-    # --- Safety Checks ---
     if X_train.shape[0] < 10:
         print("❌ Not enough training data. Try selecting a later start date.")
         return None, None, None, None, None
-
     if X_test.shape[0] < 1:
         print("❌ No valid test samples found. Check your end date.")
         return None, None, None, None, None
 
-    # --- Train model ---
-    model = model_func(input_shape=X_train.shape[1])
+    model = model_func(input_shape=X_train.shape[1:])
     model.fit(
-    X_train, y_train,
-    epochs=150,
-    batch_size=32,
-    verbose=0,
-    validation_split=0.1,
-    shuffle=False,  #  Added this line to add deterministic characterstic to the solution
-    callbacks=[EarlyStopping(patience=10, restore_best_weights=True)]
+        X_train, y_train,
+        epochs=150,
+        batch_size=32,
+        verbose=0,
+        validation_split=0.1,
+        shuffle=False,
+        callbacks=[EarlyStopping(patience=10, restore_best_weights=True)]
     )
 
     predictions = model.predict(X_test).flatten()
 
-    # --- Metrics ---
     mse = mean_squared_error(y_test, predictions)
     mae = mean_absolute_error(y_test, predictions)
     rmse = np.sqrt(mse)
 
-    # --- Plot ---
     plt.figure(figsize=(14, 6))
-    
-    # Measured data: triangles + dashed lines
     plt.plot(times, y_test, label='Actual Power', color='black', marker='^', linestyle='--')
-    
-    # Predicted data: smooth dashed line
     plt.plot(times, predictions, label='Predicted Power', color='orange', linestyle='--')
-    
     plt.title(f"Predicted vs Actual Power at {site_label}\nMAE={mae:.4f}, RMSE={rmse:.4f}")
     plt.xlabel('Time')
     plt.ylabel('Power')
@@ -181,27 +165,24 @@ def plot_forecast_vs_actual(site_df, start_time, end_time, site_label, model_fun
 
     return predictions, y_test, mse, mae, rmse
 
-
 # --- Main Execution ---
 if __name__ == "__main__":
-    
+
     print("Computation started")
 
-    
     site_df, site_name = load_and_filter_by_site(site_files, site_index)
     filter_and_plot(site_df, variable_name, starting_time, ending_time, site_name)
     predictions, y_test, mse, mae, rmse = plot_forecast_vs_actual(
-        site_df, starting_time, ending_time, site_name, create_mlp_model, lookback_hours
+        site_df, starting_time, ending_time, site_name, create_lstm_model, lookback_hours
     )
 
     print(f"Mean Squared Error (MSE):  {mse:.5f}")
     print(f"Mean Absolute Error (MAE):  {mae:.5f}")
     print(f"Root Mean Square Error (RMSE): {rmse:.5f}")
 
-
     end_time = time.time()
     total_time = end_time - start_time
     minutes = int(total_time // 60)
     seconds = int(total_time % 60)
-    
+
     print(f"\n⏱️ Total execution time: {minutes} min {seconds} sec")
