@@ -1,6 +1,7 @@
 # Import Packages
 import pandas as pd
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
@@ -9,13 +10,25 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras import Input
+import tensorflow as tf
+import time
+
+#--Start timer of computational time.
+start_time = time.time()
+
+#--This piece of code makes the neural network process more deterministic and stable at each run.
+seed = 42
+random.seed(seed)
+np.random.seed(seed)
+tf.random.set_seed(seed)
+
 
 # --- User Inputs ---
 variable_name = "Power"       # e.g., "temperature_2m", "Power", etc.
 site_index = 2                # 1 to 4
 starting_time = "2021-01-01"  # Included; YYYY-MM-DD
 ending_time = "2021-01-02"    # Excluded (1-day prediction)
-lookback_hours = 6            # History window for NN input
+lookback_hours = 6           # History window for NN input
 
 # --- File Paths ---
 script_dir = Path(__file__).resolve().parent
@@ -41,6 +54,12 @@ def load_and_filter_by_site(site_files, site_index):
     site_to_process = f'Location{site_index}'
     site_df = combined_df[combined_df['Site'] == site_to_process].copy()
     site_df['Time'] = pd.to_datetime(site_df['Time'])
+    
+    # ⏰ Add time-of-day features
+    site_df['hour'] = site_df['Time'].dt.hour
+    site_df['hour_sin'] = np.sin(2 * np.pi * site_df['hour'] / 24)
+    site_df['hour_cos'] = np.cos(2 * np.pi * site_df['hour'] / 24)
+    
     return site_df, site_to_process
 
 # --- Function 2: Filter by time and plot selected variable ---
@@ -64,18 +83,23 @@ def filter_and_plot(site_df, variable_name, start_time, end_time, site_label):
 def create_mlp_model(input_shape):
     model = Sequential()
     model.add(Input(shape=(input_shape,)))
-    model.add(Dense(256, activation='relu'))  # Increased from 128
-    model.add(Dense(128, activation='relu'))  # Increased from 64
-    model.add(Dense(64, activation='relu'))   # Increased from 32
-    model.add(Dense(1))  # Output layer
+    model.add(Dense(256, activation='relu'))
+    model.add(Dense(128, activation='relu'))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(32, activation='relu'))  
+    model.add(Dense(1))
     model.compile(optimizer='adam', loss='mse')
     return model
 
 # --- Function 4: Forecast and plot prediction vs real ---
 def plot_forecast_vs_actual(site_df, start_time, end_time, site_label, model_func, lookback_hours=6):
-    features = ['temperature_2m', 'relativehumidity_2m', 'dewpoint_2m',
-                'windspeed_10m', 'windspeed_100m', 'winddirection_10m',
-                'winddirection_100m', 'windgusts_10m', 'Power']
+    features = [
+    'temperature_2m', 'relativehumidity_2m', 'dewpoint_2m',
+    'windspeed_10m', 'windspeed_100m', 'winddirection_10m',
+    'winddirection_100m', 'windgusts_10m', 'Power',
+    'hour_sin', 'hour_cos'  # These two features encode the cyclical nature of time — for example, 23:00 and 01:00 are close in the cycle, even though they're numerically far apart. The sine and cosine together allow the model to “see” the curve of the day.
+    ]
+
 
     scaler = MinMaxScaler()
     site_df_scaled = site_df.copy()
@@ -121,8 +145,15 @@ def plot_forecast_vs_actual(site_df, start_time, end_time, site_label, model_fun
 
     # --- Train model ---
     model = model_func(input_shape=X_train.shape[1])
-    model.fit(X_train, y_train, epochs=50, batch_size=32, verbose=0,
-              validation_split=0.1, callbacks=[EarlyStopping(patience=5, restore_best_weights=True)])
+    model.fit(
+    X_train, y_train,
+    epochs=150,
+    batch_size=32,
+    verbose=0,
+    validation_split=0.1,
+    shuffle=False,  #  Added this line to add deterministic characterstic to the solution
+    callbacks=[EarlyStopping(patience=10, restore_best_weights=True)]
+    )
 
     predictions = model.predict(X_test).flatten()
 
@@ -153,3 +184,16 @@ if __name__ == "__main__":
     predictions, y_test, mse, mae, rmse = plot_forecast_vs_actual(
         site_df, starting_time, ending_time, site_name, create_mlp_model, lookback_hours
     )
+
+
+print(f"Mean Squared Error (MSE):  {mse:.5f}")
+print(f"Mean Absolute Error (MAE):  {mae:.5f}")
+print(f"Root Mean Square Error (RMSE): {rmse:.5f}")
+
+
+end_time = time.time()
+total_time = end_time - start_time
+minutes = int(total_time // 60)
+seconds = int(total_time % 60)
+
+print(f"\n⏱️ Total execution time: {minutes} min {seconds} sec")
