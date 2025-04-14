@@ -26,9 +26,9 @@ tf.random.set_seed(seed)
 # --- User Inputs ---
 variable_name = "Power"       # e.g., "temperature_2m", "Power", etc.
 site_index = 2                # 1 to 4
-starting_time = "2021-01-15 12:00"  # Included; YYYY-MM-DD
-ending_time = "2021-01-16"    # Excluded (1-day prediction)
-lookback_hours = 12           # History window for NN input
+starting_time = "2021-01-01"  # Included; YYYY-MM-DD
+ending_time = "2021-01-02"    # Excluded (1-day prediction)
+lookback_hours = 6           # History window for NN input
 
 # --- File Paths ---
 script_dir = Path(__file__).resolve().parent
