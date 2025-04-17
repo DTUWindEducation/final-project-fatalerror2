@@ -169,26 +169,45 @@ def plot_forecast_vs_actual(site_df, start_time, end_time, site_label, model_fun
     return predictions, y_test, mse, mae, rmse, times
 
 # --- 24-Hour Forecast (No Future Weather) ---
-def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_func, lookback_hours):
+def forecast_next_24h_no_future_weather(site_df, end_time, site_label, model_func, lookback_hours):
     print("\n🔮 Forecasting next 24 hours using only past data (no future weather)...")
+
     features = [
         'temperature_2m', 'relativehumidity_2m', 'dewpoint_2m',
         'windspeed_10m', 'windspeed_100m', 'winddirection_10m',
         'winddirection_100m', 'windgusts_10m', 'Power',
-        'hour_sin', 'hour_cos']
+        'hour_sin', 'hour_cos'
+    ]
 
+    # Normalize features
     scaler = MinMaxScaler()
     site_df_scaled = site_df.copy()
     site_df_scaled[features] = scaler.fit_transform(site_df[features])
-    start_dt = pd.to_datetime(start_time)
-    earliest_train_date = start_dt - pd.DateOffset(months=training_window_months)
-    train_df = site_df[(site_df['Time'] >= earliest_train_date) & (site_df['Time'] < start_dt)]
+
+    # Define new start point 
+    forecast_start = pd.to_datetime(end_time) - pd.to_timedelta("23h")
+    forecast_start = pd.to_datetime(forecast_start)  # ensure it's a pandas datetime
+
+    # Extract training data before forecast start
+    train_start = forecast_start - pd.DateOffset(months=training_window_months)
+    # Get the valid time range for training
+    train_mask = (site_df_scaled['Time'] >= train_start) & (site_df_scaled['Time'] < forecast_start)
+    train_df_scaled = site_df_scaled[train_mask].reset_index(drop=True)
+    train_df_original = site_df[train_mask].reset_index(drop=True)
 
     X_train, y_train = [], []
-    for i in range(lookback_hours, len(train_df) - 1):
-        window = site_df_scaled.iloc[i - lookback_hours:i][features]
+    
+    print(f"📅 Training data window: {train_start} to {forecast_start}")
+    print(f"🧪 Total training samples in train_df_scaled: {len(train_df_scaled)}")
+    print(f"🔁 Required minimum samples: {lookback_hours + 1}")
+
+    
+    
+    
+    for i in range(lookback_hours, len(train_df_scaled) - 1):
+        window = train_df_scaled.iloc[i - lookback_hours:i][features]
         X_train.append(window.values)
-        y_train.append(site_df.iloc[i + 1]['Power'])
+        y_train.append(train_df_original.iloc[i + 1]['Power'])  # unscaled Power
 
     if len(X_train) == 0:
         print("❌ No training samples found. Aborting forecast.")
@@ -196,35 +215,35 @@ def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_f
 
     model = model_func(input_shape=X_train[0].shape)
     model.fit(np.array(X_train), np.array(y_train),
-              epochs=150, batch_size=32, verbose=0, validation_split=0.1,
-              shuffle=False, callbacks=[EarlyStopping(patience=10, restore_best_weights=True)])
+              epochs=150, batch_size=32, verbose=0,
+              validation_split=0.1, shuffle=False,
+              callbacks=[EarlyStopping(patience=10, restore_best_weights=True)])
 
-    # Extract most recent complete lookback_hours sequence before forecast start time
-    recent_sequence_df = site_df_scaled[site_df_scaled['Time'] < start_dt].tail(lookback_hours)
-    if len(recent_sequence_df) < lookback_hours:
-        print(f"❌ Extracted sequence too short: expected {lookback_hours}, got {len(recent_sequence_df)}.")
+    # Extract initial sequence
+    sequence_df = site_df_scaled[site_df_scaled['Time'] < forecast_start].tail(lookback_hours)
+    if len(sequence_df) < lookback_hours:
+        print(f"❌ Extracted sequence too short: expected {lookback_hours}, got {len(sequence_df)}.")
         return
+    sequence = sequence_df[features].values.copy()
 
-    sequence = recent_sequence_df[features].values.copy()
-
-    predicted_power = []
-    future_times = []
-    actual_power = []
+    predicted_power, actual_power, future_times = [], [], []
 
     for i in range(24):
         input_seq = np.expand_dims(sequence[-lookback_hours:], axis=0)
         pred = model.predict(input_seq, verbose=0).flatten()[0]
         predicted_power.append(pred)
 
-        forecast_time = start_dt + pd.Timedelta(hours=i + 1)
+        forecast_time = forecast_start + pd.Timedelta(hours=i)
         future_times.append(forecast_time)
 
+        # Get true measurement for comparison
         if forecast_time in site_df['Time'].values:
-            actual = site_df[site_df['Time'] == forecast_time]['Power'].values[0]
+            actual = site_df.loc[site_df['Time'] == forecast_time, 'Power'].values[0]
             actual_power.append(actual)
         else:
             actual_power.append(np.nan)
 
+        # Prepare next row with predicted Power + cyclical time features
         hour = forecast_time.hour
         next_row = np.zeros(len(features))
         next_row[features.index('Power')] = pred
@@ -232,6 +251,7 @@ def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_f
         next_row[features.index('hour_cos')] = np.cos(2 * np.pi * hour / 24)
         sequence = np.vstack([sequence, next_row])
 
+    # Plot aligned forecast
     plt.figure(figsize=(14, 6))
     plt.plot(future_times, predicted_power, label='Forecasted Power', linestyle='-', color='orange')
     plt.plot(future_times, actual_power, label='Measured Power', linestyle='--', color='black', marker='^')
@@ -243,8 +263,10 @@ def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_f
     plt.tight_layout()
     plt.show()
 
+    # Estimate capacity factor
     capacity_factor = np.nanmean(predicted_power)
     print(f"\n📊 Estimated Capacity Factor (next 24h): {capacity_factor:.2%}")
+
 
 # --- Main Execution ---
 if __name__ == "__main__":
@@ -261,7 +283,8 @@ if __name__ == "__main__":
     print(f"RMSE: {rmse:.5f}")
 
     plot_persistence_model(np.array(y_test), times)
-    forecast_next_24h_no_future_weather(site_df, ending_time, site_name, create_lstm_model, lookback_hours)
+    forecast_next_24h_no_future_weather(site_df, starting_time, site_name, create_lstm_model, lookback_hours)
+
 
     end_time = time.time()
     total_time = end_time - start_time
