@@ -181,29 +181,30 @@ def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_f
         'hour_sin', 'hour_cos'
     ]
 
-    # Normalize features, but use a separate scaler for 'Power' only
+    feature_cols = [f for f in features if f != 'Power']
+
+    # Normalize features (split scalers: one for features, one for Power)
     scaler_features = MinMaxScaler()
     scaler_power = MinMaxScaler()
 
     site_df_scaled = site_df.copy()
-    site_df_scaled[features] = scaler_features.fit_transform(site_df[features])
-    site_df_scaled['Power'] = scaler_power.fit_transform(site_df[['Power']])
 
-    # Forecast from the provided starting time
+    # Scale non-power features
+    site_df_scaled[feature_cols] = scaler_features.fit_transform(site_df[feature_cols])
+
+    # Scale Power separately
+    site_df_scaled[['Power']] = scaler_power.fit_transform(site_df[['Power']])
+
+    # Forecasting window
     forecast_start = pd.to_datetime(start_time)
     forecast_end = forecast_start + pd.Timedelta(hours=23)
     print(f"📅 Forecasting from {forecast_start} to {forecast_end}")
 
-    # Extract training data before forecast start
+    # Training window
     train_end = forecast_start
     train_start = train_end - pd.DateOffset(months=training_window_months)
     train_mask = (site_df_scaled['Time'] >= train_start) & (site_df_scaled['Time'] < train_end)
     train_df_scaled = site_df_scaled[train_mask].reset_index(drop=True)
-    train_df_original = site_df[train_mask].reset_index(drop=True)
-
-    print(f"📅 Training data window: {train_start} to {train_end}")
-    print(f"🧪 Total training samples in train_df_scaled: {len(train_df_scaled)}")
-    print(f"🔁 Required minimum samples: {lookback_hours + 1}")
 
     X_train, y_train = [], []
     for i in range(lookback_hours, len(train_df_scaled) - 1):
@@ -215,28 +216,27 @@ def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_f
         print("❌ No training samples found. Aborting forecast.")
         return
 
+    X_train = np.array(X_train)
+    y_train = np.array(y_train)
+
     model = model_func(input_shape=X_train[0].shape)
-    model.fit(np.array(X_train), np.array(y_train),
+    model.fit(X_train, y_train,
               epochs=150, batch_size=32, verbose=0,
               validation_split=0.1, shuffle=False,
               callbacks=[EarlyStopping(patience=10, restore_best_weights=True)])
 
-    # Extract initial sequence
+    # Initial sequence for autoregressive forecasting
     sequence_df = site_df_scaled[site_df_scaled['Time'] < forecast_start].tail(lookback_hours)
     if len(sequence_df) < lookback_hours:
         print(f"❌ Extracted sequence too short: expected {lookback_hours}, got {len(sequence_df)}.")
         return
     sequence = sequence_df[features].values.copy()
 
-    # Get actual power series (same as in main plots)
+    # Actual measured Power for comparison
     actual_series_mask = (site_df['Time'] >= forecast_start) & (site_df['Time'] <= forecast_end)
     actual_series = site_df[actual_series_mask].copy()
-
-    # Resample to hourly data, taking the mean of numeric columns only
     actual_series.set_index('Time', inplace=True)
     actual_series = actual_series.resample('H').mean(numeric_only=True).reset_index()
-
-    # Reindex for lookup
     actual_series.set_index('Time', inplace=True)
 
     predicted_power, actual_power, future_times = [], [], []
@@ -244,8 +244,8 @@ def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_f
     for i in range(24):
         input_seq = np.expand_dims(sequence[-lookback_hours:], axis=0)
         pred_scaled = model.predict(input_seq, verbose=0).flatten()[0]
-        
-        # Inverse scale the predicted power using the Power-only scaler
+
+        # Inverse scale predicted Power
         real_power = scaler_power.inverse_transform([[pred_scaled]])[0][0]
         predicted_power.append(real_power)
 
@@ -255,11 +255,18 @@ def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_f
         if forecast_time in actual_series.index:
             actual_power.append(actual_series.loc[forecast_time]['Power'])
         else:
-            # Find the nearest timestamp if exact match fails
             nearest_time = actual_series.index[np.argmin(np.abs(actual_series.index - forecast_time))]
             actual_power.append(actual_series.loc[nearest_time]['Power'])
 
-    # Plot aligned forecast
+        # Update sequence with the new predicted value and time features
+        new_row = sequence[-1].copy()
+        new_row[features.index('Power')] = pred_scaled
+        current_hour = forecast_time.hour
+        new_row[features.index('hour_sin')] = np.sin(2 * np.pi * current_hour / 24)
+        new_row[features.index('hour_cos')] = np.cos(2 * np.pi * current_hour / 24)
+        sequence = np.vstack([sequence, new_row])
+
+    # Plotting
     plt.figure(figsize=(14, 6))
     plt.plot(future_times, predicted_power, label='Forecasted Power', linestyle='-', color='orange')
     plt.plot(future_times, actual_power, label='Measured Power', linestyle='--', color='black', marker='^')
@@ -271,10 +278,9 @@ def forecast_next_24h_no_future_weather(site_df, start_time, site_label, model_f
     plt.tight_layout()
     plt.show()
 
-    # Estimate capacity factor
+    # Capacity Factor
     capacity_factor = np.nanmean(predicted_power)
     print(f"\n📊 Estimated Capacity Factor (next 24h): {capacity_factor:.2%}")
-
 
 
 
