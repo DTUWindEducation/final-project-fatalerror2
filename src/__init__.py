@@ -18,6 +18,10 @@ random.seed(42)
 np.random.seed(42)
 tf.random.set_seed(42)
 
+
+
+
+
 # --- SVM Utilities ---
 def load_site_data(site_index):
     folder_path = Path(__file__).parents[1]
@@ -71,7 +75,7 @@ def train_and_save_svm(site_index, num_lags=2):
 
     return mae, mse, rmse
 
-def plot_prediction_vs_actual(site_index, start_time, end_time, num_lags=2):
+def plot_prediction_vs_actual(site_index, site_name, start_time, end_time, num_lags=2):
     df, _ = load_site_data(site_index)
     for lag in range(1, num_lags + 1):
         df[f'Power_t-{lag}'] = df['Power'].shift(lag)
@@ -96,9 +100,9 @@ def plot_prediction_vs_actual(site_index, start_time, end_time, num_lags=2):
     subset['Predicted_Power'] = model.predict(X_scaled)
 
     plt.figure(figsize=(12, 5))
-    plt.plot(subset['Time'], subset['Power'], label="Actual Power")
-    plt.plot(subset['Time'], subset['Predicted_Power'], label="Predicted Power (SVM)")
-    plt.title(f"Site {site_index} - Predicted vs Actual Power with SVM")
+    plt.plot(subset['Time'], subset['Power'], 'k^-', label="Measured Power")
+    plt.plot(subset['Time'], subset['Predicted_Power'], 'b.-', label="Predicted Power (SVM)")
+    plt.title(f"{site_name} - Measured vs Predicted Power (SVM)")
     plt.xlabel("Time")
     plt.ylabel("Power")
     plt.legend()
@@ -117,13 +121,13 @@ def load_and_filter_by_site(inputs_dir, site_index):
     df['hour'] = df['Time'].dt.hour
     df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
     df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
-    return df, f'Location{site_index}'
+    return df, f'Location {site_index}'
 
-def filter_and_plot(df, variable, start, end, site_name):
+def filter_and_plot(df, variable, site_index, start, end, site_name):
     filtered = df[(df['Time'] >= pd.to_datetime(start)) & (df['Time'] <= pd.to_datetime(end))]
     plt.figure(figsize=(12, 6))
     plt.plot(filtered['Time'], filtered[variable], label=variable)
-    plt.title(f"{variable} at {site_name}")
+    plt.title(f"Location {site_index} - {variable}")
     plt.xlabel('Time')
     plt.ylabel(variable)
     plt.grid(True)
@@ -190,9 +194,9 @@ def plot_forecast_vs_actual(df, start, end, site_name, model_func, lookback, tra
     rmse = np.sqrt(mse)
 
     plt.figure(figsize=(14, 6))
-    plt.plot(times, y_test, label='Measured Power', color='black', linestyle='--')
-    plt.plot(times, predictions, label='Predicted Power (LSTM)', color='orange')
-    plt.title(f"Predicted vs Measured Power at {site_name}\nMAE={mae:.4f}, RMSE={rmse:.4f}")
+    plt.plot(times, y_test, 'k^-', label='Measured Power')
+    plt.plot(times, predictions, 'b.-', label='Predicted Power (LSTM)')
+    plt.title(f"{site_name} - Predicted vs Measured Power (Neural Networks)")
     plt.xlabel('Time')
     plt.ylabel('Power')
     plt.legend()
@@ -201,3 +205,10 @@ def plot_forecast_vs_actual(df, start, end, site_name, model_func, lookback, tra
     plt.show()
 
     return predictions, y_test, mse, mae, rmse, times
+
+
+
+def print_evaluation_metrics(mae, mse, rmse):
+    print(f"mean squared error (MSE):  {mse:.5f}")
+    print(f"mean absolute error (MAE):  {mae:.5f}")
+    print(f"root mean square error (RMSE): {rmse:.5f}")
