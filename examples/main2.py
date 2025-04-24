@@ -14,7 +14,7 @@ import tensorflow as tf
 import time
 
 # --- Config ---
-faster_mode = True
+faster_mode = False
 seed = 42
 
 # --- Reproducibility ---
@@ -27,8 +27,8 @@ variable_name = "Power"
 site_index = 2
 starting_time = "2021-06-15"
 ending_time = "2021-06-16"
-lookback_hours = 36
-training_window_months = 24
+lookback_hours = 18
+training_window_months = 6
 
 # --- File Paths ---
 script_dir = Path(__file__).resolve().parent
