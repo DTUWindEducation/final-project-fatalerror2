@@ -23,13 +23,13 @@ from src import (train_and_save_svm,
 # --- User Configurations ---
 site_index = 1
 variable_name = "Power"
-start_time = "2021-01-05"
-end_time = "2021-01-10"
+start_time = "2017-01-20"
+end_time = "2017-01-21"
 
 # --- Machine Learning Configurations ---
-num_lags = 5 #SVM Model
-lookback_hours = 18 #Neural Network Model
-training_window_months = 6 #Neural Network Model
+num_lags = 5 # SVM Model
+lookback_hours = 18 # Neural Network Model
+
 
 # --- Data Files Directory ---
 project_root = Path(__file__).resolve().parent.parent
@@ -57,8 +57,7 @@ print("\n--- Initializing Neural Network LSTM Training... ---")
 predictions, y_test, mse, mae, rmse, times = plot_forecast_vs_actual(
     site_df, start_time, end_time, site_name,
     model_func=create_lstm_model,
-    lookback=lookback_hours,
-    training_months=training_window_months)
+    lookback=lookback_hours)
 
 print("\n--- LSTM Evaluation ---")
 print_evaluation_metrics(mae, mse, rmse)
