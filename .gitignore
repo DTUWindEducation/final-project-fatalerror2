@@ -1,6 +1,7 @@
 # files to ignore in this repo
 # inputs/
-outputs/
+outputs/*.tmp
+outputs/*.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
