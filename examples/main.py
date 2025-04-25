@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import numpy as np
 import time
 
 # Start timing
@@ -16,7 +17,8 @@ from src import (train_and_save_svm,
                 load_and_filter_by_site, 
                 filter_and_plot, 
                 create_lstm_model, 
-                plot_forecast_vs_actual)
+                plot_forecast_vs_actual,
+                plot_persistence_model)
 
 # --- User Configurations ---
 site_index = 1
@@ -61,6 +63,11 @@ predictions, y_test, mse, mae, rmse, times = plot_forecast_vs_actual(
 print("\n--- LSTM Evaluation ---")
 print_evaluation_metrics(mae, mse, rmse)
 
+# --- Persistence Model Evaluation ---
+print("\n--- Generating Persistance Model ---")
+mae, mse, rmse = plot_persistence_model(np.array(y_test), times)
+print("\n--- Persistance Evaluation ---")
+print_evaluation_metrics(mae, mse, rmse)
 
 
 # Compute and print total time

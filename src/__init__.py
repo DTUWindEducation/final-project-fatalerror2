@@ -126,7 +126,7 @@ def load_and_filter_by_site(inputs_dir, site_index):
 def filter_and_plot(df, variable, site_index, start, end, site_name):
     filtered = df[(df['Time'] >= pd.to_datetime(start)) & (df['Time'] <= pd.to_datetime(end))]
     plt.figure(figsize=(12, 6))
-    plt.plot(filtered['Time'], filtered[variable], label=variable)
+    plt.plot(filtered['Time'], filtered[variable], color='black', linestyle='-', marker='^', label=variable)
     plt.title(f"Location {site_index} - {variable}")
     plt.xlabel('Time')
     plt.ylabel(variable)
@@ -134,6 +134,7 @@ def filter_and_plot(df, variable, site_index, start, end, site_name):
     plt.legend()
     plt.tight_layout()
     plt.show()
+
 
 def create_lstm_model(input_shape):
     model = Sequential([
@@ -206,8 +207,36 @@ def plot_forecast_vs_actual(df, start, end, site_name, model_func, lookback, tra
 
     return predictions, y_test, mse, mae, rmse, times
 
+# --- Persistance Utilities ---
+
+def plot_persistence_model(y_test, times):
+    if len(y_test) < 2:
+        print("⚠️ Not enough data for persistence model.")
+        return
+
+    y_persistence = np.roll(y_test, 1)
+    y_persistence[0] = y_test[0]
+
+    mse = mean_squared_error(y_test[1:], y_persistence[1:])
+    mae = mean_absolute_error(y_test[1:], y_persistence[1:])
+    rmse = np.sqrt(mse)
+
+    plt.figure(figsize=(14, 6))
+    plt.plot(times, y_test, label='Measured Power', color='black', marker='^', linestyle='-')
+    plt.plot(times, y_persistence, label='Persistence Model', color='blue', marker='o', linestyle='-')
+    plt.title("Persistence Model vs Measured Power")
+    plt.xlabel('Time')
+    plt.ylabel('Power')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return mae, mse, rmse
 
 
+
+# --- Metric Utilities ---
 def print_evaluation_metrics(mae, mse, rmse):
     print(f"mean squared error (MSE):  {mse:.5f}")
     print(f"mean absolute error (MAE):  {mae:.5f}")
