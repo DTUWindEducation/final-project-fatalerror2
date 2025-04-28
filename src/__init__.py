@@ -31,7 +31,7 @@ def load_site_data(site_index):
     site_path = folder_path / f"inputs/Location{site_index}.csv"
     df = pd.read_csv(site_path)
     df['Time'] = pd.to_datetime(df['Time'])
-    return df, site_path
+    return df
 
 def load_and_filter_by_site(inputs_dir, site_index):
     """Load site data and add time-related features (sine/cosine of hour)."""
@@ -42,7 +42,7 @@ def load_and_filter_by_site(inputs_dir, site_index):
     df['hour'] = df['Time'].dt.hour
     df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
     df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
-    return df, f'Location{site_index}'
+    return df
 
 # =============================================
 # SVM MODEL UTILITIES
@@ -96,7 +96,7 @@ def train_and_save_svm(site_index, num_lags=2):
         scaler = joblib.load(scaler_path)
 
         # Load data for evaluation
-        df, _ = load_site_data(site_index)
+        df = load_site_data(site_index)
         X, y, _ = prepare_features(df, num_lags=num_lags)
         
         # Data splitting (80-20 split)
@@ -109,7 +109,7 @@ def train_and_save_svm(site_index, num_lags=2):
 
     else:
         print("🛠️ Training new SVM model...")
-        df, _ = load_site_data(site_index)
+        df = load_site_data(site_index)
         X, y, _ = prepare_features(df, num_lags=num_lags)
 
         # --------------------------
@@ -153,14 +153,14 @@ def train_and_save_svm(site_index, num_lags=2):
 
     return mae, mse, rmse
 
-def plot_prediction_vs_actual(site_index, site_name, start_time, end_time, num_lags=2):
+def plot_prediction_vs_actual(site_index, start_time, end_time, num_lags=2):
     """
     Plot SVM predictions vs actual values for a specific time period.
     """
     # --------------------------
     # Data Preparation
     # --------------------------
-    df, _ = load_site_data(site_index)
+    df = load_site_data(site_index)
     for lag in range(1, num_lags + 1):
         df[f'Power_t-{lag}'] = df['Power'].shift(lag)
 
@@ -196,7 +196,7 @@ def plot_prediction_vs_actual(site_index, site_name, start_time, end_time, num_l
     plt.figure(figsize=(12, 5))
     plt.plot(subset['Time'], subset['Power'], 'k^-', label="Measured Power")
     plt.plot(subset['Time'], subset['Predicted_Power'], 'b.-', label="Predicted Power (SVM)")
-    plt.title(f"{site_name} - Measured vs Predicted Power (SVM)")
+    plt.title(f"Location{site_index} - Measured vs Predicted Power (SVM)")
     plt.xlabel("Time")
     plt.ylabel("Power")
     plt.legend()
@@ -221,7 +221,7 @@ def create_lstm_model(input_shape):
     model.compile(optimizer='adam', loss=tf.keras.losses.MeanSquaredError())
     return model
 
-def plot_forecast_vs_actual(df, start, end, site_name, model_func, lookback):
+def plot_forecast_vs_actual(df, start, end, site_index, model_func, lookback):
     """
     Train or load LSTM model and plot predictions vs actual values.
     Handles data preparation, scaling, windowing, and evaluation.
@@ -239,8 +239,8 @@ def plot_forecast_vs_actual(df, start, end, site_name, model_func, lookback):
     # File Path Setup
     # --------------------------
     folder_path = Path(__file__).parents[1] / "outputs"
-    model_path = folder_path / f"{site_name}_lstm_model.h5"
-    scaler_path = folder_path / f"{site_name}_lstm_scaler.pkl"
+    model_path = folder_path / f"Location{site_index}_lstm_model.h5"
+    scaler_path = folder_path / f"Location{site_index}_lstm_scaler.pkl"
     folder_path.mkdir(parents=True, exist_ok=True)
 
     # --------------------------
@@ -333,7 +333,7 @@ def plot_forecast_vs_actual(df, start, end, site_name, model_func, lookback):
     plt.figure(figsize=(14, 6))
     plt.plot(times, y_test, 'k^-', label='Measured Power')
     plt.plot(times, predictions, 'b.-', label='Predicted Power (LSTM)')
-    plt.title(f"{site_name} - Predicted vs Measured Power (Neural Networks)")
+    plt.title(f"Location{site_index} - Predicted vs Measured Power (Neural Networks)")
     plt.xlabel('Time')
     plt.ylabel('Power')
     plt.legend()
@@ -390,7 +390,7 @@ def print_evaluation_metrics(mae, mse, rmse):
     print(f"Mean Absolute Error (MAE):   {mae:.5f}")
     print(f"Root Mean Squared Error (RMSE): {rmse:.5f}\n")
 
-def filter_and_plot(df, variable, site_index, start, end, site_name):
+def filter_and_plot(df, variable, site_index, start, end):
     """
     Helper function to filter and plot time series data.
     """

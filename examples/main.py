@@ -36,8 +36,8 @@ project_root = Path(__file__).resolve().parent.parent
 inputs_dir = project_root / "inputs"
 
 # --- Plot Desired Variable for Selected Site ---
-site_df, site_name = load_and_filter_by_site(inputs_dir, site_index)
-filter_and_plot(site_df, variable_name, site_index, start_time, end_time, site_name)
+site_df = load_and_filter_by_site(inputs_dir, site_index)
+filter_and_plot(site_df, variable_name, site_index, start_time, end_time)
 
 print("\n--- Starting Machine Learning Models... ---")
 
@@ -49,13 +49,13 @@ print("\n--- Starting Prediction ... ---")
 print("\n--- SVM Evaluation ---")
 print_evaluation_metrics(mae, mse, rmse)
 
-plot_prediction_vs_actual(site_index, site_name, start_time, end_time, num_lags=num_lags)
+plot_prediction_vs_actual(site_index, start_time, end_time, num_lags=num_lags)
 
 # --- Run LSTM ---
 print("\n--- Initializing Neural Network LSTM Training... ---")
 
 predictions, y_test, mse, mae, rmse, times = plot_forecast_vs_actual(
-    site_df, start_time, end_time, site_name,
+    site_df, start_time, end_time, site_index,
     model_func=create_lstm_model,
     lookback=lookback_hours)
 
