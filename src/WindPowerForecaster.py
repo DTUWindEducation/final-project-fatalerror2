@@ -32,6 +32,7 @@ class WindPowerForecaster:
             (site_df['Time'] <= pd.to_datetime(self.end_time))]
         filtered_time = filtered['Time']
         filtered_variable = filtered[variable]
+
         plt.figure(figsize=(12, 6))
         plt.plot(filtered_time, filtered_variable, color='black',
                  linestyle='-', marker='^', label=variable)
@@ -272,6 +273,7 @@ class WindPowerForecaster:
 
         return predictions, y_test, mse, mae, rmse, times
 
+
     def plot_persistence_result(self, y_test, times):
         """
         Implement and plot persistence model (naive forecast).
@@ -304,4 +306,3 @@ class WindPowerForecaster:
         plt.show()
 
         return mae, mse, rmse
-    
