@@ -306,3 +306,120 @@ class WindPowerForecaster:
         plt.show()
 
         return mae, mse, rmse
+
+    def compute_daily_capacity_factor(self, site_df):
+        """Compute daily capacity factor from hourly power data."""
+        site_df['Date'] = site_df['Time'].dt.date
+        daily_cf = site_df.groupby('Date')['Power'].mean().reset_index()
+        daily_cf.rename(columns={'Power': 'CapacityFactor'}, inplace=True)
+        return daily_cf
+
+    def create_lagged_cf_features(self, daily_cf, num_lags=10):
+        """Create lag features from daily capacity factors."""
+        df = daily_cf.copy()
+        for lag in range(1, num_lags + 1):
+            df[f'CF_t-{lag}'] = df['CapacityFactor'].shift(lag)
+        df['Target'] = df['CapacityFactor'].shift(-1)
+        df.dropna(inplace=True)
+        feature_cols = [f'CF_t-{lag}' for lag in range(1, num_lags + 1)]
+        return df, feature_cols
+
+
+    def train_capacity_factor_model(self, num_lags):
+        """Train or load a model to predict daily capacity factor using past N days as features."""
+    
+        from sklearn.model_selection import GridSearchCV
+    
+        # Setup paths
+        folder_path = Path(__file__).parents[1] / "outputs"
+        model_path = folder_path / f"Location{self.site_index}_cf_model.pkl"
+        scaler_path = folder_path / f"Location{self.site_index}_cf_scaler.pkl"
+        folder_path.mkdir(parents=True, exist_ok=True)
+    
+        # Load site data
+        inputs_dir = Path(__file__).parents[1] / "inputs"
+        site_df = load_and_filter_by_site(inputs_dir, self.site_index)
+    
+        # Compute daily capacity factor
+        daily_cf = self.compute_daily_capacity_factor(site_df)
+    
+        # Create lag features
+        df_lagged, feature_cols = self.create_lagged_cf_features(daily_cf, num_lags=num_lags)
+    
+        # Save lagged dataset for prediction
+        self.daily_cf = daily_cf
+        self.feature_cols = feature_cols
+        self.num_lags = num_lags
+        self.df_lagged = df_lagged
+    
+        # Prepare input X and output y
+        X = df_lagged[feature_cols].values
+        y = df_lagged['Target'].values
+    
+        # Train/Test split (80% training, 20% testing)
+        split_index = int(len(X) * 0.8)
+        self.X_train, self.X_test = X[:split_index], X[split_index:]
+        self.y_train, self.y_test = y[:split_index], y[split_index:]
+    
+        if model_path.exists() and scaler_path.exists():
+            print("💾 Loading existing CF model and scaler...")
+            self.cf_model = joblib.load(model_path)
+            self.scaler = joblib.load(scaler_path)
+        else:
+            print("🛠️ Training new CF model with Grid Search...")
+    
+            # Scale features
+            self.scaler = StandardScaler()
+            self.X_train_scaled = self.scaler.fit_transform(self.X_train)
+            self.X_test_scaled = self.scaler.transform(self.X_test)
+    
+            # Define SVR and grid search parameters
+            param_grid = {
+                'C': [0.1, 1, 10, 100],
+                'epsilon': [0.01, 0.1, 0.2],
+                'gamma': ['scale', 'auto']
+            }
+    
+            grid_search = GridSearchCV(SVR(kernel='rbf'), param_grid, cv=5, n_jobs=-1, verbose=0)
+            grid_search.fit(self.X_train_scaled, self.y_train)
+    
+            # Best model
+            self.cf_model = grid_search.best_estimator_
+    
+            # Save model and scaler
+            joblib.dump(self.cf_model, model_path)
+            joblib.dump(self.scaler, scaler_path)
+            print("✅ CF model (tuned) and scaler saved.")
+    
+    def predict_capacity_factor(self):
+        """Predict capacity factor for start_time based on past N days and trained model."""
+        predict_date = pd.to_datetime(self.start_time).date()
+    
+        if predict_date not in self.df_lagged['Date'].values:
+            print(f"⚠️ Date {predict_date} not found or insufficient past days for prediction.")
+            return
+    
+        # Find feature row for this specific prediction date
+        row = self.df_lagged[self.df_lagged['Date'] == predict_date]
+    
+        if row.empty:
+            print(f"⚠️ Not enough historical data before {predict_date} to build features.")
+            return
+    
+        X_pred = row[self.feature_cols].values
+        X_pred_scaled = self.scaler.transform(X_pred)
+    
+        # Model predicts capacity factor
+        y_pred = self.cf_model.predict(X_pred_scaled)[0]
+    
+        # Actual capacity factor for the target day
+        actual_cf = row['Target'].values[0]
+    
+        # Compute percentual error
+        percentual_error = abs((y_pred - actual_cf) / actual_cf) * 100
+    
+        print("\n=== 📈 Capacity Factor Forecast Result ===")
+        print(f"Prediction Date: {predict_date}")
+        print(f"Predicted CF:    {y_pred:.4f}")
+        print(f"Actual CF:       {actual_cf:.4f}")
+        print(f"Percentual Error: {percentual_error:.2f}%")
