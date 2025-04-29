@@ -1,3 +1,4 @@
+"""Class for wind power forecasting"""
 import os
 import sys
 import numpy as np
@@ -7,8 +8,8 @@ from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import joblib
-from keras.models import load_model
-from keras.callbacks import EarlyStopping
+from tensorflow.python.keras.models import load_model
+from keras.src.callbacks import EarlyStopping
 from pathlib import Path
 
 # Add the parent directory (project root) to sys.path
@@ -21,12 +22,15 @@ class WindPowerForecaster:
         self.site_index = site_index
         self.start_time = start_time
         self.end_time = end_time
-        
+
     def filter_and_plot(self, inputs_dir, variable):
-        site_df = load_and_filter_by_site(inputs_dir, self.site_index)
         """
         Helper function to filter and plot time series data.
+        Args:
+            inputs_dir (_type_): _description_
+            variable (_type_): _description_
         """
+        site_df = load_and_filter_by_site(inputs_dir, self.site_index)
         filtered = site_df[(site_df['Time'] >= pd.to_datetime(self.start_time)) & (site_df['Time'] <= pd.to_datetime(self.end_time))]
         plt.figure(figsize=(12, 6))
         plt.plot(filtered['Time'], filtered[variable], color='black', linestyle='-', marker='^', label=variable)
@@ -99,7 +103,7 @@ class WindPowerForecaster:
         rmse = np.sqrt(mse)
 
         return mae, mse, rmse
-    
+
     def print_evaluation_metrics(self, mae, mse, rmse):
         """
         Print formatted evaluation metrics for model comparison.
@@ -201,7 +205,7 @@ class WindPowerForecaster:
         # Model Training/Loading
         if not model_path.exists():
             print("🛠️ Training new LSTM model...")
-            
+
             # Create sliding windows for LSTM
             X_train, y_train = [], []
             for i in range(lookback_hours, len(train_df) - 1):
@@ -242,7 +246,7 @@ class WindPowerForecaster:
             return None, None, None, None, None, None
 
         X_test, y_test = np.array(X_test), np.array(y_test)
-        
+
         # Prediction
         predictions = model.predict(X_test).flatten()
 
@@ -264,7 +268,8 @@ class WindPowerForecaster:
         plt.show()
 
         return predictions, y_test, mse, mae, rmse, times
-    
+
+
     def plot_persistence_result(self, y_test, times):
         """
         Implement and plot persistence model (naive forecast).
