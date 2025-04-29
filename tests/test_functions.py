@@ -88,3 +88,52 @@ def test_train_and_save_svm():
         assert mse > 0, "MSE should be greater than 0."
         assert rmse > 0, "RMSE should be greater than 0."
         mock_joblib_dump.assert_called()  # Ensure the model and scaler were saved
+
+from src import determine_winner
+
+def test_determine_winner_best_in_all_metrics():
+    """Test when one model is the best in all three metrics."""
+    # Given
+    models_metrics = {
+        "ModelA": {"MAE": 10, "MSE": 100, "RMSE": 10},
+        "ModelB": {"MAE": 15, "MSE": 150, "RMSE": 12},
+        "ModelC": {"MAE": 20, "MSE": 200, "RMSE": 14},
+    }
+
+    # When
+    winner = determine_winner(models_metrics)
+
+    # Then
+    assert winner == "ModelA", "ModelA should be the winner as it is best in all metrics."
+
+
+def test_determine_winner_lowest_rmse():
+    """Test when the winner is determined by the lowest RMSE."""
+    # Given
+    models_metrics = {
+        "ModelA": {"MAE": 15, "MSE": 150, "RMSE": 12},
+        "ModelB": {"MAE": 10, "MSE": 100, "RMSE": 10},
+        "ModelC": {"MAE": 20, "MSE": 200, "RMSE": 14},
+    }
+
+    # When
+    winner = determine_winner(models_metrics)
+
+    # Then
+    assert winner == "ModelB", "ModelB should be the winner as it has the lowest RMSE."
+
+
+def test_determine_winner_tie_breaker_by_mae():
+    """Test when there is a tie in RMSE, and the winner is determined by MAE."""
+    # Given
+    models_metrics = {
+        "ModelA": {"MAE": 10, "MSE": 100, "RMSE": 10},
+        "ModelB": {"MAE": 8, "MSE": 100, "RMSE": 10},  # Tie in RMSE, but lower MAE
+        "ModelC": {"MAE": 12, "MSE": 120, "RMSE": 10},
+    }
+
+    # When
+    winner = determine_winner(models_metrics)
+
+    # Then
+    assert winner == "ModelB", "ModelB should be the winner as it has the lowest MAE in a tie."

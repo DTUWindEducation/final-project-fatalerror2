@@ -67,9 +67,11 @@ def determine_winner(models_metrics):
         mae_values = {model: metrics['MAE'] for model, metrics in models_metrics.items()}
         winner = min(mae_values, key=mae_values.get)
         print(f"\n🏆 Winner (tie-breaker by MAE): {winner}\n")
+        return winner
     else:
         winner = first[0]
         print(f"\n🏆 Winner (by lowest RMSE): {winner}\n")
+        return winner
 
 # =============================================
 # SVM MODEL UTILITIES
