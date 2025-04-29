@@ -1,11 +1,13 @@
-import pandas as pd
-import numpy as np
-from pathlib import Path
+"""Supplimentary functions"""
 import random
+from pathlib import Path
+import numpy as np
+import pandas as pd
 import tensorflow as tf
+from tensorflow.keras import Input
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras import Input
+from tensorflow.keras.losses import MeanSquaredError
 
 # =============================================
 # REPRODUCIBILITY SETUP
@@ -64,9 +66,9 @@ def prepare_features(df, num_lags=2):
     # Create target variable (power at next time step)
     df_copy['Power+1'] = df_copy['Power'].shift(-1)
     df_copy.dropna(inplace=True)
-    X = df_copy[features].values
+    x = df_copy[features].values
     y = df_copy['Power+1'].values
-    return X, y, features
+    return x, y, features
 
 
 def create_lstm_model(input_shape):
@@ -78,6 +80,5 @@ def create_lstm_model(input_shape):
         LSTM(32),
         Dense(1)
     ])
-    model.compile(optimizer='adam', loss=tf.keras.losses.MeanSquaredError())
+    model.compile(optimizer='adam', loss=MeanSquaredError())
     return model
-
