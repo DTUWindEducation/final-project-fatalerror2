@@ -5,9 +5,10 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow.keras import Input
+from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.losses import MeanSquaredError
+
 
 # =============================================
 # REPRODUCIBILITY SETUP
@@ -82,3 +83,34 @@ def create_lstm_model(input_shape):
     ])
     model.compile(optimizer='adam', loss=MeanSquaredError())
     return model
+
+def determine_winner(models_metrics):
+    """
+    models_metrics: dict
+        Format -> {'ModelName': {'MAE': float, 'MSE': float, 'RMSE': float}}
+    """
+
+    # Step 1: Check if one model is best in all three metrics
+    best_mae = min(models_metrics, key=lambda x: models_metrics[x]['MAE'])
+    best_mse = min(models_metrics, key=lambda x: models_metrics[x]['MSE'])
+    best_rmse = min(models_metrics, key=lambda x: models_metrics[x]['RMSE'])
+
+    if best_mae == best_mse == best_rmse:
+        print(f"\n🏆 Winner: {best_mae} (best in all metrics)\n")
+        return best_mae
+
+    # Step 2: Otherwise, pick by lowest RMSE
+    rmse_values = {model: metrics['RMSE'] for model, metrics in models_metrics.items()}
+    sorted_rmse = sorted(rmse_values.items(), key=lambda item: item[1])
+
+    first, second = sorted_rmse[0], sorted_rmse[1]
+    diff_percentage = abs(first[1] - second[1]) / first[1]
+
+    if diff_percentage < 0.01:  # less than 1% difference
+        # Tie-breaker: Use MAE
+        mae_values = {model: metrics['MAE'] for model, metrics in models_metrics.items()}
+        winner = min(mae_values, key=mae_values.get)
+        print(f"\n🏆 Winner (tie-breaker by MAE): {winner}\n")
+    else:
+        winner = first[0]
+        print(f"\n🏆 Winner (by lowest RMSE): {winner}\n")
