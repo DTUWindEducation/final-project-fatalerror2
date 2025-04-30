@@ -167,9 +167,7 @@ class WindPowerForecaster:
         return fig
 
     def plot_lstm_result(self, model_funct, lookback_hours):
-        """
-        Train or load LSTM model and plot predictions vs actual values.
-        """
+        """Train or load LSTM model and plot predictions vs actual values."""
         features = [
             'temperature_2m', 'relativehumidity_2m', 'dewpoint_2m',
             'windspeed_10m', 'windspeed_100m', 'winddirection_10m',
@@ -369,8 +367,8 @@ class WindPowerForecaster:
 
             # Scale features
             self.scaler = StandardScaler()
-            self.X_train_scaled = self.scaler.fit_transform(self.x_train)
-            self.X_test_scaled = self.scaler.transform(self.x_test)
+            self.x_train_scaled = self.scaler.fit_transform(self.x_train)
+            self.x_test_scaled = self.scaler.transform(self.x_test)
 
             # Define SVR and grid search parameters
             param_grid = {
@@ -380,7 +378,7 @@ class WindPowerForecaster:
             }
 
             grid_search = GridSearchCV(SVR(kernel='rbf'), param_grid, cv=5, n_jobs=-1, verbose=0)
-            grid_search.fit(self.X_train_scaled, self.y_train)
+            grid_search.fit(self.x_train_scaled, self.y_train)
 
             # Best model
             self.cf_model = grid_search.best_estimator_
@@ -389,7 +387,7 @@ class WindPowerForecaster:
             joblib.dump(self.cf_model, model_path)
             joblib.dump(self.scaler, scaler_path)
             print("✅ CF model (tuned) and scaler saved.")
-        
+
         return self.cf_model, self.scaler
 
     def predict_capacity_factor(self):
@@ -424,10 +422,3 @@ class WindPowerForecaster:
         print(f"Predicted CF:    {y_pred:.4f}")
         print(f"Actual CF:       {actual_cf:.4f}")
         print(f"Percentual Error: {percentual_error:.2f}%")
-
-df = load_site_data(1)
-start_time = "2020-11-15"
-end_time = "2020-11-16"
-forecaster = WindPowerForecaster(site_index=1, start_time=start_time, end_time=end_time)
-forecaster.train_capacity_factor_model(num_lags=10)
-forecaster.predict_capacity_factor()
