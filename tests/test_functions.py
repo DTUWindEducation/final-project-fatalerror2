@@ -11,12 +11,16 @@ import pandas as pd
 from unittest.mock import MagicMock, patch
 import tempfile
 
+
 # Add the parent directory (project root) to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from src import determine_winner
+from src import load_site_data
+from src.WindPowerForecaster import WindPowerForecaster
+from src import load_and_filter_by_site
 
 
 #test the function load_site_data using pytest
-from src import load_site_data
 
 
 def test_load_site_data():
@@ -37,8 +41,20 @@ def test_load_site_data():
     assert 'Power' in df.columns, "Power column is missing."
     assert np.isclose(df['Power'].iloc[0], power_exp), "Power value does not match the expected value."
 
-# Import the WindPowerForecaster class and its methods
-from src.WindPowerForecaster import WindPowerForecaster
+def test_load_and_filter_by_site():
+    """Test the load_and_filter_by_site function."""
+    # Given
+    inputs_dir = Path(__file__).parents[1] / "inputs"
+    site_index = 3
+
+    # When
+    df = load_and_filter_by_site(inputs_dir, site_index)
+
+    # Then
+    assert not df.empty, "DataFrame is empty."
+    assert 'hour' in df.columns, "Hour column is missing."
+    assert 'hour_sin' in df.columns, "Hour sine column is missing."
+    assert 'hour_cos' in df.columns, "Hour cosine column is missing."
 
 
 def test_train_and_save_svm():
@@ -89,7 +105,6 @@ def test_train_and_save_svm():
         assert rmse > 0, "RMSE should be greater than 0."
         mock_joblib_dump.assert_called()  # Ensure the model and scaler were saved
 
-from src import determine_winner
 
 def test_determine_winner_best_in_all_metrics():
     """Test when one model is the best in all three metrics."""
