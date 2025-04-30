@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from unittest.mock import MagicMock, patch
 import tempfile
+from tensorflow.keras.losses import MeanSquaredError
+import tensorflow as tf
 
 
 # Add the parent directory (project root) to sys.path
@@ -17,11 +19,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src import determine_winner
 from src import load_site_data
 from src.WindPowerForecaster import WindPowerForecaster
-from src import load_and_filter_by_site
+from src import load_and_filter_by_site, prepare_features, create_lstm_model
 
 
 #test the function load_site_data using pytest
 
+####################################
+# Tests for functions in __init__.py
+####################################
 
 def test_load_site_data():
     """Test the load_site_data function. 
@@ -41,21 +46,65 @@ def test_load_site_data():
     assert 'Power' in df.columns, "Power column is missing."
     assert np.isclose(df['Power'].iloc[0], power_exp), "Power value does not match the expected value."
 
-def test_load_and_filter_by_site():
-    """Test the load_and_filter_by_site function."""
+def validate_prepare_features_output(X, y, features, mock_df, num_lags):
+    """Helper function to validate the output of prepare_features. See function below for mock data"""
+    # Check the shape of the feature matrix and target variable
+    assert X.shape[0] == len(mock_df) - num_lags - 1, "Feature matrix has incorrect number of rows."
+    assert X.shape[1] == len(mock_df.columns) + num_lags - 1, "Feature matrix has incorrect number of columns."
+    assert y.shape[0] == len(mock_df) - num_lags - 1, "Target vector has incorrect number of rows."
+
+    # Check that lagged features are included
+    expected_features = [
+        'temperature_2m', 'relativehumidity_2m', 'dewpoint_2m',
+        'windspeed_10m', 'windspeed_100m',
+        'winddirection_10m', 'winddirection_100m',
+        'windgusts_10m', 'Power_t-1', 'Power_t-2'
+    ]
+    assert features == expected_features, "Feature list does not match expected features."
+
+    # Check that the target variable is shifted correctly
+    assert np.array_equal(y, mock_df["Power"].iloc[num_lags + 1:].values), "Target variable is incorrect."
+
+
+def test_prepare_features():
+    """Test the prepare_features function."""
     # Given
-    inputs_dir = Path(__file__).parents[1] / "inputs"
-    site_index = 3
+    mock_df = pd.DataFrame({
+        'Power': np.random.rand(10),
+        'temperature_2m': np.random.rand(10),
+        'relativehumidity_2m': np.random.rand(10),
+        'dewpoint_2m': np.random.rand(10),
+        'windspeed_10m': np.random.rand(10),
+        'windspeed_100m': np.random.rand(10),
+        'winddirection_10m': np.random.rand(10),
+        'winddirection_100m': np.random.rand(10),
+        'windgusts_10m': np.random.rand(10),
+    })
+    num_lags = 2
 
     # When
-    df = load_and_filter_by_site(inputs_dir, site_index)
+    X, y, features = prepare_features(mock_df, num_lags)
 
     # Then
-    assert not df.empty, "DataFrame is empty."
-    assert 'hour' in df.columns, "Hour column is missing."
-    assert 'hour_sin' in df.columns, "Hour sine column is missing."
-    assert 'hour_cos' in df.columns, "Hour cosine column is missing."
+    validate_prepare_features_output(X, y, features, mock_df, num_lags)
 
+def test_create_lstm_model():
+    """Test the create_lstm_model function."""
+    # Given
+    input_shape = (10, 5)  #Just an example shape, adjust if needed
+
+    # When
+    model = create_lstm_model(input_shape)
+
+    # Then
+    assert model is not None, "Model should be created successfully."
+    assert len(model.layers) > 0, "Model should have layers."
+    assert model.input_shape == (None, 10, 5), "Input shape of the model is incorrect."
+    assert isinstance(model.layers[0], tf.keras.layers.LSTM), "First layer should be LSTM."
+
+#################################################
+#Tests for functions in WindPowerForecaster class
+#################################################
 
 def test_train_and_save_svm():
     """Test the train_and_save_svm function."""
