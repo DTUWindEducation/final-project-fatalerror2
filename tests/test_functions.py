@@ -46,6 +46,29 @@ def test_load_site_data():
     assert 'Power' in df.columns, "Power column is missing."
     assert np.isclose(df['Power'].iloc[0], power_exp), "Power value does not match the expected value."
 
+
+def test_load_and_filter_by_site():
+    """Test the load_and_filter_by_site function. 
+    Specifically, check if the function correctly loads and filters data for a given site index."""
+    # Given
+    inputs_dir = Path(__file__).parents[1] / "inputs"
+    site_index = 1
+    power_exp = 0.1635  # Expected value of power
+
+    # When
+    df = load_and_filter_by_site(inputs_dir, site_index)
+
+    # Then
+    assert not df.empty, "DataFrame is empty."
+    assert 'Time' in df.columns, "Time column is missing."
+    assert pd.api.types.is_datetime64_any_dtype(df['Time']), "Time column is not in datetime format."
+    assert 'hour' in df.columns, "Hour column is missing."
+    assert 'hour_sin' in df.columns, "Hour sine column is missing."
+    assert 'hour_cos' in df.columns, "Hour cosine column is missing."
+    assert 'Power' in df.columns, "Power column is missing."
+    assert np.isclose(df['Power'].iloc[0], power_exp), "Power value does not match the expected value."
+
+
 def validate_prepare_features_output(X, y, features, mock_df, num_lags):
     """Helper function to validate the output of prepare_features. See function below for mock data"""
     # Check the shape of the feature matrix and target variable
@@ -87,6 +110,7 @@ def test_prepare_features():
 
     # Then
     validate_prepare_features_output(X, y, features, mock_df, num_lags)
+
 
 def test_create_lstm_model():
     """Test the create_lstm_model function."""
@@ -150,10 +174,10 @@ def test_determine_winner_tie_breaker_by_mae():
     # Then
     assert winner == "ModelB", "ModelB should be the winner as it has the lowest MAE in a tie."
 
-    #################################################
+
+#################################################
 #Tests for functions in WindPowerForecaster class
 #################################################
-
 
 def test_filter_and_plot():
     """Test the filter_and_plot function."""
@@ -169,7 +193,7 @@ def test_filter_and_plot():
 
     # Mock data
     mock_data = {
-        "Time": pd.date_range(start="2022-01-01", periods=48, freq="H"),
+        "Time": pd.date_range(start="2022-01-01", periods=48, freq="h"),
         "Power": np.random.rand(48),
     }
     mock_df = pd.DataFrame(mock_data)
@@ -241,4 +265,27 @@ def test_train_and_save_svm():
         assert mse > 0, "MSE should be greater than 0."
         assert rmse > 0, "RMSE should be greater than 0."
         mock_joblib_dump.assert_called()  # Ensure the model and scaler were saved
+
+
+def test_print_evaluation_metrics(capsys):
+    """Test the print_evaluation_metrics function."""
+    # Given
+    mae = 1.23456
+    mse = 2.34567
+    rmse = 3.45678
+
+    # When
+    forecaster = WindPowerForecaster(site_index=1, start_time="2020-11-15", end_time="2020-11-16")
+    forecaster.print_evaluation_metrics(mae, mse, rmse)
+
+    # Then
+    captured = capsys.readouterr()
+    expected_output = (
+        "\n=== MODEL EVALUATION METRICS ===\n"
+        "Mean Absolute Error (MAE):   1.23456\n"
+        "Mean Squared Error (MSE):    2.34567\n"
+        "Root Mean Squared Error (RMSE): 3.45678\n\n"
+    )
+    assert captured.out == expected_output
+
 
