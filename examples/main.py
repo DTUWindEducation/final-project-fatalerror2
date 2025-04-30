@@ -48,7 +48,7 @@ forecaster.plot_svm_result(num_lags=num_lags_SVM)
 # --- Run LSTM ---
 print("\n--- Initializing Neural Network LSTM Training... ---")
 
-_, y_test, lstm_mse, lstm_mae, lstm_rmse, times = forecaster.plot_lstm_result(
+_, y_test, lstm_mse, lstm_mae, lstm_rmse, times, _ = forecaster.plot_lstm_result(
     model_funct=create_lstm_model,
     lookback_hours=lookback_hours)
 
