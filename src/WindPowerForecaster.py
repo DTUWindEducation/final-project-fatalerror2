@@ -152,7 +152,7 @@ class WindPowerForecaster:
         subset['Predicted_Power'] = model.predict(x_scaled)
 
         # Plotting
-        plt.figure(figsize=(12, 5))
+        fig = plt.figure(figsize=(12, 5))
         plt.plot(subset['Time'], subset['Power'], 'k^-', label="Measured Power")
         plt.plot(subset['Time'], subset['Predicted_Power'],
                  'b.-', label="Predicted Power (SVM)")
@@ -163,6 +163,8 @@ class WindPowerForecaster:
         plt.grid(True)
         plt.tight_layout()
         plt.show()
+
+        return fig
 
     def plot_lstm_result(self, model_funct, lookback_hours):
         """
@@ -261,7 +263,7 @@ class WindPowerForecaster:
         rmse = np.sqrt(mse)
 
         # Plotting
-        plt.figure(figsize=(14, 6))
+        fig = plt.figure(figsize=(14, 6))
         plt.plot(times, y_test, 'k^-', label='Measured Power')
         plt.plot(times, predictions, 'b.-', label='Predicted Power (LSTM)')
         plt.title(f"Location{self.site_index} - Predicted vs Measured Power (Neural Networks)")
@@ -272,7 +274,7 @@ class WindPowerForecaster:
         plt.tight_layout()
         plt.show()
 
-        return predictions, y_test, mse, mae, rmse, times
+        return predictions, y_test, mse, mae, rmse, times, fig
 
     def plot_persistence_result(self, y_test, times):
         """
@@ -387,6 +389,8 @@ class WindPowerForecaster:
             joblib.dump(self.cf_model, model_path)
             joblib.dump(self.scaler, scaler_path)
             print("✅ CF model (tuned) and scaler saved.")
+        
+        return self.cf_model, self.scaler
 
     def predict_capacity_factor(self):
         """Predict capacity factor for start_time based on past N days and trained model."""
@@ -420,3 +424,10 @@ class WindPowerForecaster:
         print(f"Predicted CF:    {y_pred:.4f}")
         print(f"Actual CF:       {actual_cf:.4f}")
         print(f"Percentual Error: {percentual_error:.2f}%")
+
+df = load_site_data(1)
+start_time = "2020-11-15"
+end_time = "2020-11-16"
+forecaster = WindPowerForecaster(site_index=1, start_time=start_time, end_time=end_time)
+forecaster.train_capacity_factor_model(num_lags=10)
+forecaster.predict_capacity_factor()
