@@ -88,4 +88,3 @@ forecaster.predict_capacity_factor()
 # Compute and print total time
 total_time = time.time() - execution_start_time
 print(f"\nTotal execution time: {int(total_time // 60)} min {int(total_time % 60)} sec")
-
