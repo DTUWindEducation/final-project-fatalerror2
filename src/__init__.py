@@ -4,10 +4,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from tensorflow.keras import Input
-from tensorflow.keras.losses import MeanSquaredError
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras import Input # pylint: disable=E0401,E0611
+from tensorflow.keras.losses import MeanSquaredError # pylint: disable=E0401,E0611
+from tensorflow.keras.models import Sequential # pylint: disable=E0401,E0611
+from tensorflow.keras.layers import LSTM, Dense, Dropout # pylint: disable=E0401,E0611
 
 
 # =============================================
@@ -67,11 +67,11 @@ def determine_winner(models_metrics):
         mae_values = {model: metrics['MAE'] for model, metrics in models_metrics.items()}
         winner = min(mae_values, key=mae_values.get)
         print(f"\n🏆 Winner (tie-breaker by MAE): {winner}\n")
-        return winner
     else:
         winner = first[0]
         print(f"\n🏆 Winner (by lowest RMSE): {winner}\n")
-        return winner
+
+    return winner
 
 # =============================================
 # SVM MODEL UTILITIES
@@ -116,5 +116,3 @@ def create_lstm_model(input_shape):
     ])
     model.compile(optimizer='adam', loss=MeanSquaredError())
     return model
-
-
