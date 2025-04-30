@@ -102,10 +102,98 @@ def test_create_lstm_model():
     assert model.input_shape == (None, 10, 5), "Input shape of the model is incorrect."
     assert isinstance(model.layers[0], tf.keras.layers.LSTM), "First layer should be LSTM."
 
-#################################################
+
+def test_determine_winner_best_in_all_metrics():
+    """Test when one model is the best in all three metrics."""
+    # Given
+    models_metrics = {
+        "ModelA": {"MAE": 10, "MSE": 100, "RMSE": 10},
+        "ModelB": {"MAE": 15, "MSE": 150, "RMSE": 12},
+        "ModelC": {"MAE": 20, "MSE": 200, "RMSE": 14},
+    }
+
+    # When
+    winner = determine_winner(models_metrics)
+
+    # Then
+    assert winner == "ModelA", "ModelA should be the winner as it is best in all metrics."
+
+
+def test_determine_winner_lowest_rmse():
+    """Test when the winner is determined by the lowest RMSE."""
+    # Given
+    models_metrics = {
+        "ModelA": {"MAE": 15, "MSE": 150, "RMSE": 12},
+        "ModelB": {"MAE": 10, "MSE": 100, "RMSE": 10},
+        "ModelC": {"MAE": 20, "MSE": 200, "RMSE": 14},
+    }
+
+    # When
+    winner = determine_winner(models_metrics)
+
+    # Then
+    assert winner == "ModelB", "ModelB should be the winner as it has the lowest RMSE."
+
+
+def test_determine_winner_tie_breaker_by_mae():
+    """Test when there is a tie in RMSE, and the winner is determined by MAE."""
+    # Given
+    models_metrics = {
+        "ModelA": {"MAE": 10, "MSE": 100, "RMSE": 10},
+        "ModelB": {"MAE": 8, "MSE": 100, "RMSE": 10},  # Tie in RMSE, but lower MAE
+        "ModelC": {"MAE": 12, "MSE": 120, "RMSE": 10},
+    }
+
+    # When
+    winner = determine_winner(models_metrics)
+
+    # Then
+    assert winner == "ModelB", "ModelB should be the winner as it has the lowest MAE in a tie."
+
+    #################################################
 #Tests for functions in WindPowerForecaster class
 #################################################
 
+
+def test_filter_and_plot():
+    """Test the filter_and_plot function."""
+    # Given
+    site_index = 1
+    start_time = "2022-01-01"
+    end_time = "2022-01-02"
+    inputs_dir = Path("mock_inputs_dir")  # Mock directory for inputs
+    variable = "Power"
+
+    # Create an instance of WindPowerForecaster
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+
+    # Mock data
+    mock_data = {
+        "Time": pd.date_range(start="2022-01-01", periods=48, freq="H"),
+        "Power": np.random.rand(48),
+    }
+    mock_df = pd.DataFrame(mock_data)
+
+    # Correctly patch load_and_filter_by_site
+    with patch("src.WindPowerForecaster.load_and_filter_by_site", return_value=mock_df) as mock_load_and_filter_by_site, \
+         patch("matplotlib.pyplot.show") as mock_plt_show:
+        # When
+        forecaster.filter_and_plot(inputs_dir, variable)
+
+        # Then
+        mock_load_and_filter_by_site.assert_called_once_with(inputs_dir, site_index)
+        mock_plt_show.assert_called_once()
+
+        # Verify the filtered data
+        filtered_df = mock_df[
+            (mock_df["Time"] >= pd.to_datetime(start_time)) &
+            (mock_df["Time"] <= pd.to_datetime(end_time))
+        ]
+        assert not filtered_df.empty, "Filtered DataFrame should not be empty."
+        assert filtered_df["Time"].min() >= pd.to_datetime(start_time), "Filtered data starts before start_time."
+        assert filtered_df["Time"].max() <= pd.to_datetime(end_time), "Filtered data ends after end_time."
+
+        
 def test_train_and_save_svm():
     """Test the train_and_save_svm function."""
     # Given
@@ -154,50 +242,3 @@ def test_train_and_save_svm():
         assert rmse > 0, "RMSE should be greater than 0."
         mock_joblib_dump.assert_called()  # Ensure the model and scaler were saved
 
-
-def test_determine_winner_best_in_all_metrics():
-    """Test when one model is the best in all three metrics."""
-    # Given
-    models_metrics = {
-        "ModelA": {"MAE": 10, "MSE": 100, "RMSE": 10},
-        "ModelB": {"MAE": 15, "MSE": 150, "RMSE": 12},
-        "ModelC": {"MAE": 20, "MSE": 200, "RMSE": 14},
-    }
-
-    # When
-    winner = determine_winner(models_metrics)
-
-    # Then
-    assert winner == "ModelA", "ModelA should be the winner as it is best in all metrics."
-
-
-def test_determine_winner_lowest_rmse():
-    """Test when the winner is determined by the lowest RMSE."""
-    # Given
-    models_metrics = {
-        "ModelA": {"MAE": 15, "MSE": 150, "RMSE": 12},
-        "ModelB": {"MAE": 10, "MSE": 100, "RMSE": 10},
-        "ModelC": {"MAE": 20, "MSE": 200, "RMSE": 14},
-    }
-
-    # When
-    winner = determine_winner(models_metrics)
-
-    # Then
-    assert winner == "ModelB", "ModelB should be the winner as it has the lowest RMSE."
-
-
-def test_determine_winner_tie_breaker_by_mae():
-    """Test when there is a tie in RMSE, and the winner is determined by MAE."""
-    # Given
-    models_metrics = {
-        "ModelA": {"MAE": 10, "MSE": 100, "RMSE": 10},
-        "ModelB": {"MAE": 8, "MSE": 100, "RMSE": 10},  # Tie in RMSE, but lower MAE
-        "ModelC": {"MAE": 12, "MSE": 120, "RMSE": 10},
-    }
-
-    # When
-    winner = determine_winner(models_metrics)
-
-    # Then
-    assert winner == "ModelB", "ModelB should be the winner as it has the lowest MAE in a tie."
