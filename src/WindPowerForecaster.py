@@ -45,6 +45,19 @@ class WindPowerForecaster:
         plt.tight_layout()
         plt.show()
 
+    def split_train_test(self, x, y, split_ratio=0.8):
+        """
+        Split data into training and testing sets.
+        :param x: Features
+        :param y: Target variable
+        :param split_ratio: Ratio for splitting the data
+        :return: x_train, x_test, y_train, y_test
+        """
+        split_index = int(len(x) * split_ratio)
+        x_train, x_test = x[:split_index], x[split_index:]
+        y_train, y_test = y[:split_index], y[split_index:]
+        return x_train, x_test, y_train, y_test
+
     def train_and_save_svm(self, num_lags):
         """
         Train or load SVM model for a specific site.
@@ -66,9 +79,11 @@ class WindPowerForecaster:
             x, y, _ = prepare_features(df, num_lags=num_lags)
 
             # Data splitting (80-20 split)
-            split_index = int(len(x) * 0.8)
-            x_test = scaler.transform(x[split_index:])
-            y_test = y[split_index:]
+            _, x_test, _, y_test = self.split_train_test(x, y, split_ratio=0.8)
+            x_test = scaler.transform(x_test)
+            # split_index = int(len(x) * 0.8)
+            # x_test = scaler.transform(x[split_index:])
+            # y_test = y[split_index:]
 
             # Prediction
             y_pred = model.predict(x_test)
@@ -79,9 +94,7 @@ class WindPowerForecaster:
             x, y, _ = prepare_features(df, num_lags=num_lags)
 
             # Data Splitting
-            split_index = int(len(x) * 0.8)
-            x_train, x_test = x[:split_index], x[split_index:]
-            y_train, y_test = y[:split_index], y[split_index:]
+            x_train, x_test, y_train, y_test = self.split_train_test(x, y, split_ratio=0.8)
 
             # Feature Scaling
             scaler = StandardScaler()
