@@ -48,7 +48,7 @@ forecaster.plot_svm_result(num_lags=num_lags_SVM)
 # --- Run LSTM ---
 print("\n--- Initializing Neural Network LSTM Training... ---")
 
-_, y_test, lstm_mse, lstm_mae, lstm_rmse, times = forecaster.plot_lstm_result(
+_, y_test, lstm_mse, lstm_mae, lstm_rmse, times, _ = forecaster.plot_lstm_result(
     model_funct=create_lstm_model,
     lookback_hours=lookback_hours)
 
@@ -88,4 +88,3 @@ forecaster.predict_capacity_factor()
 # Compute and print total time
 total_time = time.time() - execution_start_time
 print(f"\nTotal execution time: {int(total_time // 60)} min {int(total_time % 60)} sec")
-

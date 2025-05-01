@@ -6,11 +6,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.svm import SVR
+from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import joblib
-from tensorflow.keras.models import load_model
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.models import load_model # pylint: disable=E0401,E0611
+from tensorflow.keras.callbacks import EarlyStopping # pylint: disable=E0401,E0611
 
 # Add the parent directory (project root) to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -112,8 +113,8 @@ class WindPowerForecaster:
         """
         # Print evaluation metrics
         print("\n=== MODEL EVALUATION METRICS ===")
-        print(f"Mean Squared Error (MSE):    {mse:.5f}")
         print(f"Mean Absolute Error (MAE):   {mae:.5f}")
+        print(f"Mean Squared Error (MSE):    {mse:.5f}")
         print(f"Root Mean Squared Error (RMSE): {rmse:.5f}\n")
 
     def plot_svm_result(self, num_lags):
@@ -151,7 +152,7 @@ class WindPowerForecaster:
         subset['Predicted_Power'] = model.predict(x_scaled)
 
         # Plotting
-        plt.figure(figsize=(12, 5))
+        fig = plt.figure(figsize=(12, 5))
         plt.plot(subset['Time'], subset['Power'], 'k^-', label="Measured Power")
         plt.plot(subset['Time'], subset['Predicted_Power'],
                  'b.-', label="Predicted Power (SVM)")
@@ -163,10 +164,10 @@ class WindPowerForecaster:
         plt.tight_layout()
         plt.show()
 
+        return fig
+
     def plot_lstm_result(self, model_funct, lookback_hours):
-        """
-        Train or load LSTM model and plot predictions vs actual values.
-        """
+        """Train or load LSTM model and plot predictions vs actual values."""
         features = [
             'temperature_2m', 'relativehumidity_2m', 'dewpoint_2m',
             'windspeed_10m', 'windspeed_100m', 'winddirection_10m',
@@ -260,7 +261,7 @@ class WindPowerForecaster:
         rmse = np.sqrt(mse)
 
         # Plotting
-        plt.figure(figsize=(14, 6))
+        fig = plt.figure(figsize=(14, 6))
         plt.plot(times, y_test, 'k^-', label='Measured Power')
         plt.plot(times, predictions, 'b.-', label='Predicted Power (LSTM)')
         plt.title(f"Location{self.site_index} - Predicted vs Measured Power (Neural Networks)")
@@ -271,8 +272,7 @@ class WindPowerForecaster:
         plt.tight_layout()
         plt.show()
 
-        return predictions, y_test, mse, mae, rmse, times
-
+        return predictions, y_test, mse, mae, rmse, times, fig
 
     def plot_persistence_result(self, y_test, times):
         """
@@ -324,100 +324,99 @@ class WindPowerForecaster:
         feature_cols = [f'CF_t-{lag}' for lag in range(1, num_lags + 1)]
         return df, feature_cols
 
-
     def train_capacity_factor_model(self, num_lags):
         """Train or load a model to predict daily capacity factor using past N days as features."""
-    
-        from sklearn.model_selection import GridSearchCV
-    
+
         # Setup paths
         folder_path = Path(__file__).parents[1] / "outputs"
         model_path = folder_path / f"Location{self.site_index}_cf_model.pkl"
         scaler_path = folder_path / f"Location{self.site_index}_cf_scaler.pkl"
         folder_path.mkdir(parents=True, exist_ok=True)
-    
+
         # Load site data
         inputs_dir = Path(__file__).parents[1] / "inputs"
         site_df = load_and_filter_by_site(inputs_dir, self.site_index)
-    
+
         # Compute daily capacity factor
         daily_cf = self.compute_daily_capacity_factor(site_df)
-    
+
         # Create lag features
         df_lagged, feature_cols = self.create_lagged_cf_features(daily_cf, num_lags=num_lags)
-    
+
         # Save lagged dataset for prediction
         self.daily_cf = daily_cf
         self.feature_cols = feature_cols
         self.num_lags = num_lags
         self.df_lagged = df_lagged
-    
-        # Prepare input X and output y
-        X = df_lagged[feature_cols].values
+
+        # Prepare input x and output y
+        x = df_lagged[feature_cols].values
         y = df_lagged['Target'].values
-    
+
         # Train/Test split (80% training, 20% testing)
-        split_index = int(len(X) * 0.8)
-        self.X_train, self.X_test = X[:split_index], X[split_index:]
+        split_index = int(len(x) * 0.8)
+        self.x_train, self.x_test = x[:split_index], x[split_index:]
         self.y_train, self.y_test = y[:split_index], y[split_index:]
-    
+
         if model_path.exists() and scaler_path.exists():
             print("💾 Loading existing CF model and scaler...")
             self.cf_model = joblib.load(model_path)
             self.scaler = joblib.load(scaler_path)
         else:
             print("🛠️ Training new CF model with Grid Search...")
-    
+
             # Scale features
             self.scaler = StandardScaler()
-            self.X_train_scaled = self.scaler.fit_transform(self.X_train)
-            self.X_test_scaled = self.scaler.transform(self.X_test)
-    
+            self.x_train_scaled = self.scaler.fit_transform(self.x_train)
+            self.x_test_scaled = self.scaler.transform(self.x_test)
+
             # Define SVR and grid search parameters
             param_grid = {
                 'C': [0.1, 1, 10, 100],
                 'epsilon': [0.01, 0.1, 0.2],
                 'gamma': ['scale', 'auto']
             }
-    
+
             grid_search = GridSearchCV(SVR(kernel='rbf'), param_grid, cv=5, n_jobs=-1, verbose=0)
-            grid_search.fit(self.X_train_scaled, self.y_train)
-    
+            grid_search.fit(self.x_train_scaled, self.y_train)
+
             # Best model
             self.cf_model = grid_search.best_estimator_
-    
+
             # Save model and scaler
             joblib.dump(self.cf_model, model_path)
             joblib.dump(self.scaler, scaler_path)
             print("✅ CF model (tuned) and scaler saved.")
-    
+
+        return self.cf_model, self.scaler
+
     def predict_capacity_factor(self):
         """Predict capacity factor for start_time based on past N days and trained model."""
         predict_date = pd.to_datetime(self.start_time).date()
-    
+
         if predict_date not in self.df_lagged['Date'].values:
             print(f"⚠️ Date {predict_date} not found or insufficient past days for prediction.")
             return
-    
+
         # Find feature row for this specific prediction date
         row = self.df_lagged[self.df_lagged['Date'] == predict_date]
-    
+
         if row.empty:
             print(f"⚠️ Not enough historical data before {predict_date} to build features.")
             return
-    
-        X_pred = row[self.feature_cols].values
-        X_pred_scaled = self.scaler.transform(X_pred)
-    
+
+        x_pred = row[self.feature_cols].values
+        x_pred_scaled = self.scaler.transform(x_pred)
+
         # Model predicts capacity factor
-        y_pred = self.cf_model.predict(X_pred_scaled)[0]
-    
+        y_pred = self.cf_model.predict(x_pred_scaled)[0]
+
         # Actual capacity factor for the target day
         actual_cf = row['Target'].values[0]
-    
+
         # Compute percentual error
         percentual_error = abs((y_pred - actual_cf) / actual_cf) * 100
-    
+
         print("\n=== 📈 Capacity Factor Forecast Result ===")
         print(f"Prediction Date: {predict_date}")
         print(f"Predicted CF:    {y_pred:.4f}")

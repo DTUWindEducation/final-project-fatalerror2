@@ -8,10 +8,16 @@ from pathlib import Path
 import pytest
 import numpy as np
 import pandas as pd
+from pandas import Timestamp
 from unittest.mock import MagicMock, patch
 import tempfile
 from tensorflow.keras.losses import MeanSquaredError
 import tensorflow as tf
+import matplotlib.pyplot as plt
+from sklearn.svm import SVR
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import matplotlib
+matplotlib.use('Agg')  # Use a non-GUI backend
 
 
 # Add the parent directory (project root) to sys.path
@@ -45,6 +51,29 @@ def test_load_site_data():
     assert pd.api.types.is_datetime64_any_dtype(df['Time']), "Time column is not in datetime format."
     assert 'Power' in df.columns, "Power column is missing."
     assert np.isclose(df['Power'].iloc[0], power_exp), "Power value does not match the expected value."
+
+
+def test_load_and_filter_by_site():
+    """Test the load_and_filter_by_site function. 
+    Specifically, check if the function correctly loads and filters data for a given site index."""
+    # Given
+    inputs_dir = Path(__file__).parents[1] / "inputs"
+    site_index = 1
+    power_exp = 0.1635  # Expected value of power
+
+    # When
+    df = load_and_filter_by_site(inputs_dir, site_index)
+
+    # Then
+    assert not df.empty, "DataFrame is empty."
+    assert 'Time' in df.columns, "Time column is missing."
+    assert pd.api.types.is_datetime64_any_dtype(df['Time']), "Time column is not in datetime format."
+    assert 'hour' in df.columns, "Hour column is missing."
+    assert 'hour_sin' in df.columns, "Hour sine column is missing."
+    assert 'hour_cos' in df.columns, "Hour cosine column is missing."
+    assert 'Power' in df.columns, "Power column is missing."
+    assert np.isclose(df['Power'].iloc[0], power_exp), "Power value does not match the expected value."
+
 
 def validate_prepare_features_output(X, y, features, mock_df, num_lags):
     """Helper function to validate the output of prepare_features. See function below for mock data"""
@@ -87,6 +116,7 @@ def test_prepare_features():
 
     # Then
     validate_prepare_features_output(X, y, features, mock_df, num_lags)
+
 
 def test_create_lstm_model():
     """Test the create_lstm_model function."""
@@ -150,10 +180,10 @@ def test_determine_winner_tie_breaker_by_mae():
     # Then
     assert winner == "ModelB", "ModelB should be the winner as it has the lowest MAE in a tie."
 
-    #################################################
+
+#################################################
 #Tests for functions in WindPowerForecaster class
 #################################################
-
 
 def test_filter_and_plot():
     """Test the filter_and_plot function."""
@@ -169,7 +199,7 @@ def test_filter_and_plot():
 
     # Mock data
     mock_data = {
-        "Time": pd.date_range(start="2022-01-01", periods=48, freq="H"),
+        "Time": pd.date_range(start="2022-01-01", periods=48, freq="h"),
         "Power": np.random.rand(48),
     }
     mock_df = pd.DataFrame(mock_data)
@@ -241,4 +271,174 @@ def test_train_and_save_svm():
         assert mse > 0, "MSE should be greater than 0."
         assert rmse > 0, "RMSE should be greater than 0."
         mock_joblib_dump.assert_called()  # Ensure the model and scaler were saved
+
+
+def test_print_evaluation_metrics(capsys):
+    """Test the print_evaluation_metrics function."""
+    # Given
+    mae = 1.23456
+    mse = 2.34567
+    rmse = 3.45678
+
+    # When
+    forecaster = WindPowerForecaster(site_index=1, start_time="2020-11-15", end_time="2020-11-16")
+    forecaster.print_evaluation_metrics(mae, mse, rmse)
+
+    # Then
+    captured = capsys.readouterr()
+    expected_output = (
+        "\n=== MODEL EVALUATION METRICS ===\n"
+        "Mean Absolute Error (MAE):   1.23456\n"
+        "Mean Squared Error (MSE):    2.34567\n"
+        "Root Mean Squared Error (RMSE): 3.45678\n\n"
+    )
+    assert captured.out == expected_output
+
+
+def test_plot_svm_result():
+    """Test the plot_svm_result function."""
+    # Given
+    site_index = 1
+    start_time = "2020-01-01"
+    end_time = "2020-12-31"
+    num_lags = 5
+
+    # When
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+    fig = forecaster.plot_svm_result(num_lags)
+
+    # Then
+    assert isinstance(fig, plt.Figure)
+
+
+def test_plot_lstm_result():
+    """Test the plot_lstm_result function."""
+    # Given
+    site_index = 1
+    start_time = "2020-11-15"
+    end_time = "2020-11-16"
+    lookback_hours = 5
+
+    # When
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+    prediction, y_test, mse, mae, rmse, times, fig = forecaster.plot_lstm_result(
+        model_funct=create_lstm_model,
+        lookback_hours=lookback_hours
+    )
+
+    # Then
+    assert isinstance(fig, plt.Figure)
+    assert len(y_test) == len(times)
+
+
+def test_plot_persistence_result():
+    """Test the plot_persistence_result function."""
+    # Given
+    site_index = 1
+    start_time = "2020-11-15"
+    end_time = "2020-11-16"
+    num_lags = 5
+    mae_exp = 0.0157166666
+    mse_exp = 0.0004309275
+    rmse_exp = 0.020758793
+
+    # When
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+    y_test = [0.8603, 0.8648, 0.8693, 0.8738, 0.8784, 0.8789, 0.8753, 0.8718, 0.8683, 0.8648, 
+              0.8612, 0.8577, 0.8365, 0.7977, 0.7588, 0.7199, 0.6811, 0.6422, 0.6321, 0.6508, 
+              0.6694, 0.688, 0.7067, 0.7253, 0.7439]
+    times = [Timestamp('2020-11-15 00:00:00'), Timestamp('2020-11-15 01:00:00'), Timestamp('2020-11-15 02:00:00'),
+             Timestamp('2020-11-15 03:00:00'), Timestamp('2020-11-15 04:00:00'), Timestamp('2020-11-15 05:00:00'),
+             Timestamp('2020-11-15 06:00:00'), Timestamp('2020-11-15 07:00:00'), Timestamp('2020-11-15 08:00:00'),
+             Timestamp('2020-11-15 09:00:00'), Timestamp('2020-11-15 10:00:00'), Timestamp('2020-11-15 11:00:00'),
+             Timestamp('2020-11-15 12:00:00'), Timestamp('2020-11-15 13:00:00'), Timestamp('2020-11-15 14:00:00'),
+             Timestamp('2020-11-15 15:00:00'), Timestamp('2020-11-15 16:00:00'), Timestamp('2020-11-15 17:00:00'),
+             Timestamp('2020-11-15 18:00:00'), Timestamp('2020-11-15 19:00:00'), Timestamp('2020-11-15 20:00:00'),
+             Timestamp('2020-11-15 21:00:00'), Timestamp('2020-11-15 22:00:00'), Timestamp('2020-11-15 23:00:00'),
+             Timestamp('2020-11-16 00:00:00')]
+    mae, mse, rmse = forecaster.plot_persistence_result(y_test, times)
+
+    # Then
+    assert np.isclose(mae, mae_exp, rtol=1e-5), "MAE does not match expected value."
+    assert np.isclose(mse, mse_exp, rtol=1e-5), "MSE does not match expected value."
+    assert np.isclose(rmse, rmse_exp, rtol=1e-5), "RMSE does not match expected value."
+
+
+def test_create_lagged_cf_features():
+    # Given
+    site_index = 1
+    start_time = "2023-01-01"
+    end_time = "2023-01-31"
+    cp_exp = 0.19415
+
+    # When
+    df = load_site_data(site_index)
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+    daily_cf = forecaster.compute_daily_capacity_factor(df)
+
+    # Then
+    assert not daily_cf.empty, "Daily capacity factor DataFrame is empty."
+    assert np.isclose(daily_cf['Capacity_Factor'].iloc[0], cp_exp), "Capacity factor value does not match the expected value."
+
+
+def test_create_lagged_cf_features():
+    # Given
+    site_index = 1
+    start_time = "2023-01-01"
+    end_time = "2023-01-31"
+    feature_len_exp = 10
+
+    # When
+    df = load_site_data(site_index)
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+    daily_cf = forecaster.compute_daily_capacity_factor(df)
+    df2, feature = forecaster.create_lagged_cf_features(daily_cf, num_lags=10)
+
+    # Then
+    assert not df2.empty, "Daily capacity factor DataFrame is empty."
+    assert np.isclose(len(feature), feature_len_exp), "Feature length does not match expected value."
+
+
+def test_train_capacity_factor_model():
+    # Given
+    site_index = 1
+    start_time = "2023-01-01"
+    end_time = "2023-01-31"
+    feature_len_exp = 10
+
+    # When
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+    model, scaler = forecaster.train_capacity_factor_model(num_lags=10)
+
+    # Then
+    assert isinstance(model, SVR)
+    assert isinstance(scaler, StandardScaler)
+    assert hasattr(forecaster, 'x_train')
+    assert hasattr(forecaster, 'x_test')
+    assert isinstance(forecaster.x_train, np.ndarray)
+    assert isinstance(forecaster.x_test, np.ndarray)
+    assert len(forecaster.x_train) > 0
+    assert len(forecaster.x_test) > 0
+    assert hasattr(forecaster, 'cf_model')
+    assert hasattr(forecaster, 'scaler')
+
+
+def test_predict_capacity_factor(capsys):
+    # Given
+    site_index = 1
+    start_time = "2020-11-15"
+    end_time = "2020-11-16"
+
+    # When
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+    forecaster.train_capacity_factor_model(num_lags=10)
+    forecaster.predict_capacity_factor()
+    captured = capsys.readouterr()
+
+    # Then
+    assert "=== 📈 Capacity Factor Forecast Result ===\n" in captured.out
+    assert "Prediction Date: 2020-11-15\n" in captured.out
+    assert "Predicted CF:    0.4960\n" in captured.out
+    assert "Actual CF:       0.5889\n" in captured.out
+    assert "Percentual Error: 15.79%\n" in captured.out
 
