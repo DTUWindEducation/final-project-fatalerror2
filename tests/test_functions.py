@@ -11,7 +11,6 @@ import pandas as pd
 from pandas import Timestamp
 from unittest.mock import MagicMock, patch
 import tempfile
-from tensorflow.keras.losses import MeanSquaredError
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from sklearn.svm import SVR
@@ -223,7 +222,30 @@ def test_filter_and_plot():
         assert filtered_df["Time"].min() >= pd.to_datetime(start_time), "Filtered data starts before start_time."
         assert filtered_df["Time"].max() <= pd.to_datetime(end_time), "Filtered data ends after end_time."
 
-        
+
+def test_split_train_test():
+    # Given
+    site_index = 1
+    start_time = "2023-01-01"
+    end_time = "2023-01-31"
+
+    # When
+    forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
+    x = np.arange(100).reshape(-1, 1)  # Mock feature data
+    y = np.arange(100)  # Mock target data
+    x_train, x_test, y_train, y_test = forecaster.split_train_test(x, y)
+
+    # Then
+    assert len(x_train) == 80
+    assert len(x_test) == 20
+    assert len(y_train) == 80
+    assert len(y_test) == 20
+    np.testing.assert_array_equal(x_train, x[:80])
+    np.testing.assert_array_equal(x_test, x[80:])
+    np.testing.assert_array_equal(y_train, y[:80])
+    np.testing.assert_array_equal(y_test, y[80:])
+
+
 def test_train_and_save_svm():
     """Test the train_and_save_svm function."""
     # Given
