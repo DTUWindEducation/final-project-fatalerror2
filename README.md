@@ -18,3 +18,8 @@ Team: [ADD TEXT HERE!]
 ## Peer review
 
 [ADD TEXT HERE!]
+
+
+## Main.py Description
+
+![](arquitecture.svg)
