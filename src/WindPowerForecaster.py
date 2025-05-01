@@ -65,8 +65,8 @@ class WindPowerForecaster:
         """
         # File Path Setup
         folder_path = Path(__file__).parents[1]
-        model_path = folder_path / f"outputs/Location{self.site_index}_svr_model.pkl"
-        scaler_path = folder_path / f"outputs/Location{self.site_index}_scaler.pkl"
+        model_path = folder_path / f"outputs/Location{self.site_index}_svm_model.pkl"
+        scaler_path = folder_path / f"outputs/Location{self.site_index}_svm_scaler.pkl"
 
         # Model Loading/Training
         if model_path.exists() and scaler_path.exists():
@@ -156,8 +156,8 @@ class WindPowerForecaster:
 
         # Model Loading
         folder_path = Path(__file__).parents[1]
-        model = joblib.load(folder_path / f"outputs/Location{self.site_index}_svr_model.pkl")
-        scaler = joblib.load(folder_path / f"outputs/Location{self.site_index}_scaler.pkl")
+        model = joblib.load(folder_path / f"outputs/Location{self.site_index}_svm_model.pkl")
+        scaler = joblib.load(folder_path / f"outputs/Location{self.site_index}_svm_scaler.pkl")
 
         # Prediction
         x_subset = subset[features].values
