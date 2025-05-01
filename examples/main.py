@@ -7,7 +7,7 @@ import time
 # Add the parent directory (project root) to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src import create_lstm_model, determine_winner
+from src import load_site_data, prepare_features, create_lstm_model, determine_winner
 from src.WindPowerForecaster import WindPowerForecaster
 
 # Start timing
@@ -21,47 +21,50 @@ end_time = "2020-11-16"
 
 forecaster = WindPowerForecaster(site_index=site_index, start_time=start_time, end_time=end_time)
 
+# --- Data Files Directory ---
+project_root = Path(__file__).resolve().parent.parent
+inputs_dir = Path(project_root / "inputs")
+
+# Functional requirements #1: Load and parse the provided input data
+df = load_site_data(site_index)
+
+# Functional requirements #2: Plot timeseries of a selected variable for a given site within a specific perid
+forecaster.filter_and_plot(inputs_dir, variable_name)
+
 # --- Machine Learning Configurations ---
 num_lags_SVM = 5 # SVM Model and CF Prediction
 lookback_hours = 18 # Neural Network Model
 num_lags_CT_prediction = 10 # CF Prediction number of days as input features to predict the next day.
 
-# --- Data Files Directory ---
-project_root = Path(__file__).resolve().parent.parent
-inputs_dir = Path(project_root / "inputs")
-
-# --- Plot Desired Variable for Selected Site ---
-forecaster.filter_and_plot(inputs_dir, variable_name)
-
-print("\n--- Starting Machine Learning Models... ---")
+# --- Prepare Data ---
+# Functional requirements #4: Split the dataset into training dataset and test dataset
+x, y, _ = prepare_features(df, num_lags=num_lags_SVM)
+x_train, x_test, y_train, y_test = forecaster.split_train_test(x, y, split_ratio=0.8)
 
 # --- Run SVM ---
-print("\n--- Loading SVM Model ...---")
+# Functional requirements #3: Compute MAE, MSE, RMSE for SVM model
+# Functional requirements #6 & #7: Plot predictions against real power time series for SVM model
 svm_mae, svm_mse, svm_rmse = forecaster.train_and_save_svm(num_lags=num_lags_SVM)
-print("\n--- Starting Prediction ... ---")
-
-print("\n--- SVM Evaluation ---")
-forecaster.print_evaluation_metrics(svm_mae, svm_mse, svm_rmse)
-
 forecaster.plot_svm_result(num_lags=num_lags_SVM)
 
 # --- Run LSTM ---
-print("\n--- Initializing Neural Network LSTM Training... ---")
+# Functional requirements #3: Compute MAE, MSE, RMSE for LSTM model
+# Functional requirements #6 & #7: Plot predictions against real power time series for LSTM model
+_, y_test, lstm_mse, lstm_mae, lstm_rmse, times, _ = forecaster.plot_lstm_result(model_funct=create_lstm_model,
+                                                                                 lookback_hours=lookback_hours)
 
-_, y_test, lstm_mse, lstm_mae, lstm_rmse, times, _ = forecaster.plot_lstm_result(
-    model_funct=create_lstm_model,
-    lookback_hours=lookback_hours)
+# --- Run Persistence Model ---
+# Functional requirements #3: Compute MAE, MSE, RMSE for Persistence model
+# Functional requirements #5 & #7: Plot predictions against real power time series for Persistence model
+persistence_mae, persistence_mse, persistence_rmse = forecaster.plot_persistence_result(np.array(y_test), times)
 
+# --- Print the evaluation metrics for the three models ---
+print("\n--- SVM Evaluation ---")
+forecaster.print_evaluation_metrics(svm_mae, svm_mse, svm_rmse)
 print("\n--- LSTM Evaluation ---")
 forecaster.print_evaluation_metrics(lstm_mae, lstm_mse, lstm_rmse)
-
-# --- Persistence Model Evaluation ---
-print("\n--- Generating Persistance Model ---")
-persistence_mae, persistence_mse, persistence_rmse = forecaster.plot_persistence_result(np.array(y_test), times)
 print("\n--- Persistance Evaluation ---")
 forecaster.print_evaluation_metrics(persistence_mae, persistence_mse, persistence_rmse)
-
-print("\n--- Initializing Extra Functionalities ---")
 
 # --- Extra Function - Determine Best Model --- .
 
