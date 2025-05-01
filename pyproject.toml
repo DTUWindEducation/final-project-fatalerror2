@@ -11,8 +11,9 @@ version = "2020.0.0"
 dependencies = [
   "numpy",
   "matplotlib",
+  "pandas",
   "scipy",
-  "tensorflow",
+  "tensorflo; python_version < '3.12'",
   "scikit-learn", 
   "pytest", 
   "joblib"
@@ -28,7 +29,7 @@ description = "Python package for forecasting windpower forecasting using machin
 readme = "README.md"
 license = "MIT"  # or license = {file = "LICENSE.txt"} for legacy declaration
 license-files = ["LICEN[CS]E.*"]
-keywords = ["Windpower", "Forecasting", Machine learning"]
+keywords = ["Windpower", "Forecasting", "Machine learning"]
 
 
 [project.urls]
