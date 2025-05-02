@@ -8,12 +8,13 @@ packages = ["src"]
 [project]
 name = "final-project-fatalerror2"
 version = "2020.0.0"
+requires-python = ">=3.8, <3.13"
 dependencies = [
   "numpy",
   "matplotlib",
   "pandas",
   "scipy",
-  "tensorflo; python_version < '3.12'",
+  "tensorflow; python_version < '3.13'",
   "scikit-learn", 
   "pytest", 
   "joblib"
