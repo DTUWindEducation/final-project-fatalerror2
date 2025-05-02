@@ -15,7 +15,6 @@ execution_start_time = time.time()
 
 # --- User Configurations ---
 site_index = 1
-variable_name = "Power"
 start_time = "2020-11-15"
 end_time = "2020-11-16"
 
@@ -29,6 +28,7 @@ inputs_dir = Path(project_root / "inputs")
 df = load_site_data(site_index)
 
 # Functional requirements #2: Plot timeseries of a selected variable for a given site within a specific perid
+variable_name = "Power"
 forecaster.filter_and_plot(inputs_dir, variable_name)
 
 # --- Machine Learning Configurations ---
