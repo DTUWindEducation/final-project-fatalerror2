@@ -97,12 +97,16 @@ All predictive models are working on the principle of next-hour prediction. For 
 * **`plot_lstm_result(model_funct, lookback_hours)`**: Run and plots the LSTM predictions.
 * **`plot_persistence_result(y_test, times)`**: Plot the persistence predictions.
 
-### Evaluation - EXTRA FUNCTIONALITY
+### Evaluation 
 
 Prints the Mean Absolute Error (MAE), Mean Squared Error (MSE) and Root Mean Squared Error (RMSE) for the models.
 
 * **`print_evaluation_metrics(mae, mse, rmse)`**: Prints the error metrics.
 
+
+### Determine Winner - EXTRA FUNCTIONALITY
+
+Selects the best-performing model based on error metrics (MAE, MSE, RMSE). If no single model is best across all three, it defaults to the one with the lowest RMSE, using MAE as a tie-breaker if RMSEs are very close. 
 
 
 ### Capacity Factor Forecast - EXTRA FUNCTIONALITY
