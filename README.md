@@ -55,6 +55,9 @@ The `main.py` script serves as the central control for the entire wind power for
 * start_time = start date for the prediction model, i.e "2020-11-15". Make sure not to set a date too close to the         beginning of the dataset as it might not have enough to "look back" at predicting. 
 * end_time = end date for the prediction model, i.e "2020-11-16".
 
+* variable_name = name of variable of the data you wish to plot between start_time and end_time. It can be: 
+temperature_2m, relativehumidity_2m, dewpoint_2m, windspeed_10m, windspeed_100m, winddirection_10m, winddirection_100m, windgusts_10m, Power. Refer to inputs folder for a description on these variables. 
+
 * project_root = Path(__file__).resolve().parent.parent ; inputs_dir = Path(project_root / "inputs"). Directory for data. Do not change unless intended.
 
 * num_lags_SVM = 5 # number of days to look back for the SVM Model. 
