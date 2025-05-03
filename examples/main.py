@@ -32,7 +32,7 @@ variable_name = "Power"
 forecaster.filter_and_plot(inputs_dir, variable_name)
 
 # --- Machine Learning Configurations ---
-num_lags_SVM = 5 # SVM Model and CF Prediction
+num_lags_SVM = 5 # SVM Model and 
 lookback_hours = 18 # Neural Network Model
 num_lags_CT_prediction = 10 # CF Prediction number of days as input features to predict the next day.
 

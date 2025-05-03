@@ -46,7 +46,21 @@ The `main.py` script serves as the central control for the entire wind power for
 4. **Comparison**: Chooses the best model based on RMSE (with MAE tie-breaker).
 5. **Extra Functionality**: Trains and predicts **daily capacity factor** using lagged SVM models.
 
-![](arquitecture.svg)
+![](main.drawio.svg)
+
+
+## Main.py Inputs Description
+
+* site_index = integer from 1 to 4 for the desired location. 
+* start_time = start date for the prediction model, i.e "2020-11-15". Make sure not to set a date too close to the         beginning of the dataset as it might not have enough to "look back" at predicting. 
+* end_time = end date for the prediction model, i.e "2020-11-16".
+
+* project_root = Path(__file__).resolve().parent.parent ; inputs_dir = Path(project_root / "inputs"). Directory for data. Do not change unless intended.
+
+* num_lags_SVM = 5 # number of days to look back for the SVM Model. 
+* lookback_hours = 18 # number of hours to look back for the LSTM Neural Network Model.
+* num_lags_CT_prediction = 10 # number of days to look back for the SVM Model used in CF Prediction for next day. The model uses start_time as the date to predict. 
+
 
 ## `src/__init__.py` Utility Functions
 
@@ -62,6 +76,10 @@ The `main.py` script serves as the central control for the entire wind power for
 
 The `WindPowerForecaster` class (in `src/WindPowerForecaster.py`) encapsulates all model workflows:
 
+![](WindPowerForecaster.drawio.svg)
+
+
+
 ### Data
 
 * **`filter_and_plot(inputs_dir, variable)`**: Filters and visualizes time series.
@@ -69,16 +87,24 @@ The `WindPowerForecaster` class (in `src/WindPowerForecaster.py`) encapsulates a
 
 ### Forecasting
 
+All predictive models are working on the principle of next-hour prediction. For each predicted hour in the plotted times series, the models are fed with the established look-back window features. 
+
 * **`train_and_save_svm(num_lags)`**: Train or load a saved SVM model.
 * **`plot_svm_result(num_lags)`**: Plot the SVM predictions vs actual values.
 * **`plot_lstm_result(model_funct, lookback_hours)`**: Run and plots the LSTM predictions.
 * **`plot_persistence_result(y_test, times)`**: Plot the persistence predictions.
 
-### Evaluation
+### Evaluation - EXTRA FUNCTIONALITY
+
+Prints the Mean Absolute Error (MAE), Mean Squared Error (MSE) and Root Mean Squared Error (RMSE) for the models.
 
 * **`print_evaluation_metrics(mae, mse, rmse)`**: Prints the error metrics.
 
-### Capacity Factor Forecast
+
+
+### Capacity Factor Forecast - EXTRA FUNCTIONALITY
+
+For predicting next-day Capacity Factor based on the capacity factors of the look-back window established. Only the capacity factor is used as feature. 
 
 * **`train_capacity_factor_model(num_lags)`**: Builds or loads SVM for next-day capacity factor.
 * **`predict_capacity_factor()`**: Predicts and compares daily capacity factor.
