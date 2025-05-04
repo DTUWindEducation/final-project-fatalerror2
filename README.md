@@ -11,13 +11,18 @@ This project is a final assignment for the DTU course Scientific Programming for
 
 1. Requirements:
 
-* Python 3.X
-* Libraries: `os`, `sys`, `pathlib`, `time`, `pandas`, `tensorflow`, `matplotlib`, `numpy`
+* Python version 3.12 or older (>=3.8, <=3.12>). 
+* Libraries: `os`, `sys`, `pathlib`, `time`, `pandas`, `tensorflow`, `matplotlib`, `numpy`, `scikit-learn`, `scipy`, `pytest`
+* The repo contains an environment.yml file for creating a new environment if this is desired, with a compatible python version and dependencies. To create it, run the command 'conda env create -f environment.yml' in a terminal at the top level of the directory. 
+* After creating a fresh environment, run the command "pip install -e ." to install all dependencies. 
+
 
 2. Run the code:
 
 * Set the `site_index` for the target location
 * Assign the `start_time` and the `end_time` for the target time window
+* To run the code from a terminal, run the command "python examples/main.py" using the compatible environment. If package is run using an IDE, run the main.py script. 
+
 
 ## Architecture
 
