@@ -11,7 +11,7 @@ This project is a final assignment for the DTU course Scientific Programming for
 
 1. Requirements:
 
-* Python version 3.12 or older. 
+* Python version 3.12 or older (>=3.8, <=3.12>). 
 * Libraries: `os`, `sys`, `pathlib`, `time`, `pandas`, `tensorflow`, `matplotlib`, `numpy`, `scikit-learn`, `scipy`, `pytest`
 * The repo contains an environment.yml file for creating a new environment if this is desired, with a compatible python version and dependencies. To create it, run the command 'conda env create -f environment.yml' in a terminal at the top level of the directory. 
 * After creating a fresh environment, run the command "pip install -e ." to install all dependencies. 
